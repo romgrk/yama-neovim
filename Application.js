@@ -85,7 +85,7 @@ class Application {
     for (const e of events) {
       const name = e[0];
       const args = e[1];
-      console.log(name, args)
+      console.log(name, e.slice(1))
       switch (name) {
           case 'put':
               e.shift();
