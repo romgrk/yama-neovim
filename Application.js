@@ -13,6 +13,8 @@ class Application {
 
   constructor() {
     this.store = new Store()
+    this.store.on('put', () => console.log(this.store.screen.getText(this.store.cursor)))
+    this.store.on('cursor', () => console.log(this.store.screen.getText(this.store.cursor)))
   }
 
   start(command, argv, lines, columns) {
@@ -83,6 +85,7 @@ class Application {
     for (const e of events) {
       const name = e[0];
       const args = e[1];
+      console.log(name, args)
       switch (name) {
           case 'put':
               e.shift();

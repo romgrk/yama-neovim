@@ -3,11 +3,12 @@
  */
 
 const { EventEmitter } = require('events')
+const { Dispatcher } = require('flux')
 const { Kind } = require('./actions')
 // const log = require('../log')
 const ScreenDrag = require('./screen-drag')
 // const ScreenWheel = require('./screen-wheel')
-const { Dispatcher } = require('flux')
+const { Screen, Line } = require('./models.js')
 
 // TODO:
 // Debug log should be implemented subscriber of store
@@ -59,6 +60,7 @@ function colorString(new_color, fallback) {
             .join('')
     );
 }
+
 
 module.exports = class NeovimStore extends EventEmitter {
     /* dispatch_token: string;
@@ -137,6 +139,7 @@ module.exports = class NeovimStore extends EventEmitter {
         this.blink_cursor = false;
         this.cursor_blink_interval = 1000;
         this.dispatch_token = this.dispatcher.register(this.receiveAction.bind(this));
+        this.screen = new Screen(0, 0)
     }
 
     receiveAction(action) {
@@ -146,9 +149,10 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.PutText: {
-                this.emit('put', action.text);
-                this.cursor.col = this.cursor.col + action.text.length;
-                this.emit('cursor');
+                this.screen.put(this.cursor, { text: action.text.join(''), attr: copy(this.font_attr) })
+                this.cursor.col = this.cursor.col + action.text.length
+                this.emit('put', action.text)
+                this.emit('cursor')
                 break;
             }
             case Kind.Cursor: {
@@ -415,6 +419,8 @@ module.exports = class NeovimStore extends EventEmitter {
         if (this.size.lines === lines && this.size.cols === cols) {
             return false;
         }
+
+        this.screen.resize(lines, cols)
         this.size.lines = lines;
         this.size.cols = cols;
         this.scroll_region = {
@@ -423,7 +429,12 @@ module.exports = class NeovimStore extends EventEmitter {
             right: cols - 1,
             bottom: lines - 1,
         };
+
         console.log(`Screen is resized: (${lines} lines, ${cols} cols)`);
         return true;
     }
+}
+
+function copy(object) {
+    return JSON.parse(JSON.stringify(object))
 }
