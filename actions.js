@@ -75,6 +75,7 @@ const Kind = exports.Kind = {
     UpdateScreenSize: 'UpdateScreenSize',
     WheelScroll: 'WheelScroll',
     FocusChanged: 'FocusChanged',
+    Flush: 'Flush',
 }
 
 /* export interface ActionType {
@@ -340,6 +341,12 @@ exports.notifyFocusChanged = function notifyFocusChanged(focused) {
     };
 }
 
+exports.flush = function flush() {
+    return {
+        type: Kind.Flush,
+    };
+}
+
 exports.updateLineHeight = function updateLineHeight(line_height) {
     return {
         type: Kind.UpdateLineHeight,
@@ -365,16 +372,5 @@ exports.changeCursorDrawDelay = function changeCursorDrawDelay(delay) {
     return {
         type: Kind.ChangeCursorDrawDelay,
         delay,
-    };
-}
-
-exports.startBlinkCursor = function startBlinkCursor() {
-    return {
-        type: Kind.StartBlinkCursor,
-    };
-}
-exports.stopBlinkCursor = function stopBlinkCursor() {
-    return {
-        type: Kind.StopBlinkCursor,
     };
 }

@@ -83,6 +83,6 @@ module.exports = class ScreenDrag {
         // based on it.
         const offsetY = e.clientY - this.parentY;
         const offsetX = e.clientX - this.parentX;
-        return [Math.floor(offsetY / this.store.font_attr.height), Math.floor(offsetX / this.store.font_attr.width)];
+        return [Math.floor(offsetY / this.store.fontAttributes.height), Math.floor(offsetX / this.store.fontAttributes.width)];
     }
 }

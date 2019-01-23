@@ -259,19 +259,18 @@ class Screen extends Array {
             }
         }
         else /* if (count < 0) */ {
-            const destinationTop = top + count
-            const destinationBottom = bottom + count
+            const sourceTop = top + count
+            const sourceBottom = bottom + count
 
-            debugger
-            for (let i = 0, line = destinationBottom; line >= destinationTop; line--, i++) {
-                const sourceIndex = top + verticalLength - i - 1
-                if (sourceIndex > bottom || line < 0)
+            for (let i = 0, line = sourceBottom; line >= sourceTop; line--, i++) {
+                const destinationIndex = line - count
+                if (destinationIndex >= bottom || destinationIndex <= top)
                     continue
-                const currentLine = this[line]
-                const sourceLine = this[sourceIndex]
+                const sourceLine = this[line]
+                const destinationLine = this[destinationIndex]
                 const tokens = sourceLine ? sourceLine.slice(left, right) : [{ text: ' '.repeat(horizontalLength) }]
-                console.log({ i, line, destinationTop, destinationBottom })
-                currentLine.insertTokens(left, tokens)
+                console.log({ i, line, sourceTop, sourceBottom })
+                destinationLine.insertTokens(left, tokens)
             }
         }
         console.log('scrolled')

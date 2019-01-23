@@ -66,7 +66,7 @@ module.exports = class NeovimStore extends EventEmitter {
     /* dispatch_token: string;
      *
      * size: Size;
-     * font_attr: FontAttributes;
+     * fontAttributes: FontAttributes;
      * fg_color: string;
      * bg_color: string;
      * sp_color: string;
@@ -98,7 +98,7 @@ module.exports = class NeovimStore extends EventEmitter {
             width: 0,
             height: 0,
         };
-        this.font_attr = {
+        this.fontAttributes = {
             fg: 'white',
             bg: 'black',
             sp: null,
@@ -149,7 +149,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.PutText: {
-                this.screen.put(this.cursor, { text: action.text.join(''), attr: copy(this.font_attr) })
+                this.screen.put(this.cursor, { text: action.text.join(''), attr: copy(this.fontAttributes) })
                 this.cursor.col = this.cursor.col + action.text.length
                 this.emit('put', action.text)
                 this.emit('cursor')
@@ -165,19 +165,19 @@ module.exports = class NeovimStore extends EventEmitter {
             }
             case Kind.Highlight: {
                 const hl = action.highlight;
-                this.font_attr.bold = hl.bold;
-                this.font_attr.italic = hl.italic;
-                this.font_attr.underline = hl.underline;
-                this.font_attr.undercurl = hl.undercurl;
+                this.fontAttributes.bold = hl.bold;
+                this.fontAttributes.italic = hl.italic;
+                this.fontAttributes.underline = hl.underline;
+                this.fontAttributes.undercurl = hl.undercurl;
                 if (hl.reverse === true) {
-                    this.font_attr.fg = colorString(hl.background, this.bg_color);
-                    this.font_attr.bg = colorString(hl.foreground, this.fg_color);
+                    this.fontAttributes.fg = colorString(hl.background, this.bg_color);
+                    this.fontAttributes.bg = colorString(hl.foreground, this.fg_color);
                 } else {
-                    this.font_attr.fg = colorString(hl.foreground, this.fg_color);
-                    this.font_attr.bg = colorString(hl.background, this.bg_color);
+                    this.fontAttributes.fg = colorString(hl.foreground, this.fg_color);
+                    this.fontAttributes.bg = colorString(hl.background, this.bg_color);
                 }
-                this.font_attr.sp = colorString(hl.special, this.sp_color || this.fg_color);
-                console.log('Highlight is updated: ', this.font_attr);
+                this.fontAttributes.sp = colorString(hl.special, this.sp_color || this.fg_color);
+                console.log('Highlight is updated: ', this.fontAttributes);
                 break;
             }
             case Kind.FocusChanged: {
@@ -187,7 +187,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.ClearEOL: {
-                this.screen.clearLine(this.cursor.line)
+                this.screen.clearLine(this.cursor.line, this.cursor.col)
                 this.emit('clear-eol');
                 break;
             }
@@ -218,13 +218,13 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.UpdateFG: {
-                this.fg_color = colorString(action.color, this.font_attr.fg);
+                this.fg_color = colorString(action.color, this.fontAttributes.fg);
                 this.emit('update-fg');
                 console.log('Foreground color is updated: ', this.fg_color);
                 break;
             }
             case Kind.UpdateBG: {
-                this.bg_color = colorString(action.color, this.font_attr.bg);
+                this.bg_color = colorString(action.color, this.fontAttributes.bg);
                 this.emit('update-bg');
                 console.log('Background color is updated: ', this.bg_color);
                 break;
@@ -256,21 +256,21 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.UpdateFontSize: {
-                this.font_attr.draw_width = action.draw_width;
-                this.font_attr.draw_height = action.draw_height;
-                this.font_attr.width = action.width;
-                this.font_attr.height = action.height;
+                this.fontAttributes.draw_width = action.draw_width;
+                this.fontAttributes.draw_height = action.draw_height;
+                this.fontAttributes.width = action.width;
+                this.fontAttributes.height = action.height;
                 console.log('Actual font size is updated: ', action.width, action.height);
                 this.emit('font-size-changed');
                 break;
             }
             case Kind.UpdateFontPx: {
-                this.font_attr.specified_px = action.font_px;
+                this.fontAttributes.specified_px = action.font_px;
                 this.emit('font-px-specified');
                 break;
             }
             case Kind.UpdateFontFace: {
-                this.font_attr.face = action.font_face;
+                this.fontAttributes.face = action.font_face;
                 this.emit('font-face-specified');
                 break;
             }
@@ -360,6 +360,11 @@ module.exports = class NeovimStore extends EventEmitter {
                 console.log('Icon is set to ', this.icon_path);
                 break;
             }
+            case Kind.Flush: {
+                this.emit('flush');
+                break;
+            }
+
             case Kind.UpdateLineHeight: {
                 if (this.line_height !== action.line_height) {
                     this.line_height = action.line_height;
@@ -384,22 +389,6 @@ module.exports = class NeovimStore extends EventEmitter {
                 this.cursor_draw_delay = action.delay;
                 this.emit('cursor-draw-delay-changed');
                 console.log(`Drawing cursor is delayed by ${action.delay}ms`);
-                break;
-            }
-            case Kind.StartBlinkCursor: {
-                const changed = this.blink_cursor === false;
-                this.blink_cursor = true;
-                if (changed) {
-                    this.emit('blink-cursor-started');
-                }
-                break;
-            }
-            case Kind.StopBlinkCursor: {
-                const changed = this.blink_cursor === true;
-                this.blink_cursor = false;
-                if (changed) {
-                    this.emit('blink-cursor-stopped');
-                }
                 break;
             }
             case Kind.CompositionStart: {

@@ -14,16 +14,11 @@ class Application {
 
   constructor(onUpdateCallback = () => {}) {
     this.store = new Store()
-    const onUpdate = () => {
+    this.store.on('flush', () => {
       const text = this.store.screen.getText(this.store.cursor)
       console.log(text)
       onUpdateCallback(text)
-    }
-    this.store.on('put', onUpdate)
-    this.store.on('cursor', onUpdate)
-    this.store.on('clear', onUpdate)
-    this.store.on('eol_clear', onUpdate)
-    this.store.on('scroll', onUpdate)
+    })
   }
 
   start(command, argv, lines, columns) {
@@ -197,6 +192,9 @@ class Application {
               break;
           case 'set_icon':
               d.dispatch(Action.setIcon(args[0]));
+              break;
+          case 'flush':
+              d.dispatch(Action.flush());
               break;
           default:
               console.warn(chalk.bold.red('Unhandled event: ') + name, args);

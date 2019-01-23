@@ -9,12 +9,15 @@ const Gdk = gi.require('Gdk', '3.0')
 module.exports = {
   getVimInput,
   fromGdk,
-  isModifier,
+  shouldFilter,
 }
 
 
 const KEY_TABLE = {
   'slash': '/',
+  'question': '?',
+  'grave': '`',
+  'asciitilde': '~',
   'backslash': '\\',
   'dead_circumflex': '^',
   'exclam': '!',
@@ -22,11 +25,13 @@ const KEY_TABLE = {
   'numbersign': '#',
   'dollar': '$',
   'percent': '%',
+  'asciicircum': '^',
   'ampersand': '&',
   'asterisk': '*',
   'parenleft': '(',
   'parenright': ')',
   'underscore': '_',
+  'equal': '=',
   'plus': '+',
   'minus': '-',
   'bracketleft': '[',
@@ -34,7 +39,9 @@ const KEY_TABLE = {
   'braceleft': '{',
   'braceright': '}',
   'dead_diaeresis': '"',
+  'quotedbl': '"',
   'dead_acute': "'",
+  'apostrophe': "'",
   'less': 'lt',
   'greater': '>',
   'comma': ',',
@@ -83,8 +90,8 @@ function hasModifiers(event) {
   return event.ctrlKey || event.altKey || event.superKey
 }
 
-function isModifier(event) {
-  const keyval = event
+function shouldFilter(event) {
+  const keyval = event.keyval
   return (
        keyval === Gdk.KEY_Alt_L     || keyval === Gdk.KEY_Alt_R
     || keyval === Gdk.KEY_Control_L || keyval === Gdk.KEY_Control_R
@@ -92,6 +99,8 @@ function isModifier(event) {
     || keyval === Gdk.KEY_Meta_L    || keyval === Gdk.KEY_Meta_R
     || keyval === Gdk.KEY_Super_L   || keyval === Gdk.KEY_Super_R
     || keyval === Gdk.KEY_Hyper_L   || keyval === Gdk.KEY_Hyper_R
+    || keyval === Gdk.KEY_Caps_Lock
+    || keyval === Gdk.KEY_Num_Lock
   )
 }
 

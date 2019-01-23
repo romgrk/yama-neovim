@@ -6,6 +6,7 @@
 const EventEmitter = require('events')
 const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
+const Cairo = gi.require('cairo')
 
 const KeyEvent = require('./key-event.js')
 
@@ -17,6 +18,8 @@ module.exports = class Window extends EventEmitter {
     super()
 
     this.onKeyPressEvent = this.onKeyPressEvent.bind(this)
+    this.onDraw = this.onDraw.bind(this)
+
 
     // Main program window
     this.window = new Gtk.Window({
@@ -26,6 +29,10 @@ module.exports = class Window extends EventEmitter {
     // TextView
     this.textView = new Gtk.TextView()
     this.textView.setMonospace(true)
+
+    // Draw area
+    this.drawingArea = new Gtk.DrawingArea()
+    this.drawingArea.on('draw', this.onDraw)
 
     // Toolbar with buttons
     this.toolbar = new Gtk.Toolbar()
@@ -66,13 +73,13 @@ module.exports = class Window extends EventEmitter {
     // this.hbox.packStart(this.urlBar,  true,  true,  8)
 
     // pack vertically top bar (this.hbox) and scrollable window
-    // this.vbox.packStart(this.hbox,         false, true, 0)
-    this.vbox.packStart(this.scrollWindow, true,  true, 0)
+    this.hbox.packStart(this.scrollWindow, true, true, 0)
+    this.hbox.packStart(this.drawingArea,  true, true, 0)
 
     // configure main window
-    this.window.setDefaultSize(1024, 720)
+    this.window.setDefaultSize(1200, 720)
     this.window.setResizable(true)
-    this.window.add(this.vbox)
+    this.window.add(this.hbox)
 
 
     /*
@@ -105,6 +112,11 @@ module.exports = class Window extends EventEmitter {
     // window close event: returning true has the semantic of preventing the default behavior:
     // in this case, it would prevent the user from closing the window if we would return `true`
     this.window.on('delete-event', () => false)
+  }
+
+  onDraw(...args) {
+    console.log(['onDraw', ...args])
+    return true
   }
 
   onKeyPressEvent(event) {

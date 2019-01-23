@@ -18,11 +18,11 @@ const app = new Application(onUpdate)
 window.on('key-press', (event, original) => {
 
   const input = KeyEvent.getVimInput(event)
+  const shouldFilter = KeyEvent.shouldFilter(event)
 
-  console.log(input)
-  // console.log(event, input)
+  console.log('KeyPress', { input, shouldFilter })
 
-  if (!KeyEvent.isModifier(event))
+  if (!shouldFilter)
     app.client.input(input)
 })
 
