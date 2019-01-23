@@ -28,14 +28,49 @@ class Line {
         this.tokens.push(token)
     }
 
+    slice(start, end) {
+        const {startIndex, endIndex} = this._prepareSlice(start, end - start)
+
+        return this.tokens.slice(startIndex, endIndex + 1)
+    }
+
     insert(position, token) {
+        const {startIndex, endIndex} = this._prepareSlice(position, token.text.length)
+        const deleteCount = (endIndex + 1) - startIndex
+
+        this.tokens.splice(startIndex, deleteCount, token)
+    }
+
+    insertTokens(position, tokens) {
+        const length = tokens.reduce((length, t) => length + t.text.length, 0)
+        const {startIndex, endIndex} = this._prepareSlice(position, length)
+        const deleteCount = (endIndex + 1) - startIndex
+
+        this.tokens.splice(startIndex, deleteCount, ...tokens)
+    }
+
+    clear(position = 0) {
+        if (position === 0) {
+            this.tokens.splice(0, this.tokens.length)
+            return
+        }
+
+        const length = this.length - position
+        const {startIndex, endIndex} = this._prepareSlice(position, length)
+        const deleteCount = (endIndex + 1) - startIndex
+
+        this.tokens.splice(startIndex, deleteCount)
+    }
+
+    _prepareSlice(position, length) {
         let index
         let startIndex
         let endIndex
         let currentToken
-        let end = 0
+        let currentTokenEnd = 0
         let charCount = 0
-        const endPosition = position + token.text.length
+
+        const positionEnd = position + length
         const positions = []
 
         // 012345678
@@ -45,15 +80,15 @@ class Line {
         for (index = 0; index < this.tokens.length; index++) {
             positions.push(charCount)
             currentToken = this.tokens[index]
-            end = charCount + currentToken.text.length
-            const length = currentToken.text.length
-            const isPastStart = charCount + length - 1 >= position
+            currentTokenEnd = charCount + currentToken.text.length
+
+            const isPastStart = charCount + currentToken.text.length - 1 >= position
 
             if (isPastStart && startIndex === undefined) {
                 startIndex = index
             }
 
-            if (isPastStart && isInRange(endPosition, charCount, end)) {
+            if (isPastStart && isInRange(positionEnd, charCount, currentTokenEnd)) {
                 endIndex = index
                 break;
             }
@@ -66,12 +101,11 @@ class Line {
         //            |---->[1111]
         // [aaaa][bbbb]
         if (startIndex === undefined) {
-            const diff = position - end
+            const diff = position - currentTokenEnd
             if (diff > 0) {
                 this.tokens.push({ text: ' '.repeat(diff), attr: null })
             }
-            this.tokens.push(token)
-            return
+            return { startIndex: this.tokens.length, endIndex: this.tokens.length }
         }
 
 
@@ -84,7 +118,7 @@ class Line {
         if (position > positions[startIndex]) {
             const breakPoint = position - positions[startIndex]
             const textBefore = startToken.text.slice(0, breakPoint)
-            const textAfter = startToken.text.slice(breakPoint)
+            const textAfter  = startToken.text.slice(breakPoint)
 
             positions.splice(startIndex, 1, positions[startIndex], positions[startIndex] + textBefore.length)
             this.tokens.splice(startIndex, 1,
@@ -96,18 +130,21 @@ class Line {
                 endIndex += 1
         }
 
-        if (position >= charCount && endIndex === undefined) {
-            const diff = position - charCount
-            positions.push(charCount)
-            this.tokens.push({ text: ' '.repeat(diff), attr: null })
-            positions.push(diff)
+        if (endIndex === undefined) {
+            if (positionEnd >= charCount) {
+                const diff = positionEnd - charCount
+                if (diff > 0) {
+                    this.tokens.push({ text: ' '.repeat(diff), attr: null })
+                }
+            }
+            endIndex = this.tokens.length - 1
         }
         else if (endIndex !== undefined) {
             const endToken = this.tokens[endIndex]
             const endTokenEnd = positions[endIndex] + endToken.text.length
 
-            if (endPosition < endTokenEnd) {
-                const breakPoint = endToken.text.length - (endTokenEnd - endPosition)
+            if (positionEnd < endTokenEnd) {
+                const breakPoint = endToken.text.length - (endTokenEnd - positionEnd)
                 const textBefore = endToken.text.slice(0, breakPoint)
                 const textAfter  = endToken.text.slice(breakPoint)
 
@@ -118,7 +155,7 @@ class Line {
             }
         }
 
-        this.tokens.splice(startIndex, (endIndex || 0) + 1 - startIndex, token)
+        return { startIndex, endIndex }
     }
 
     setLength(length) {
@@ -188,18 +225,78 @@ class Screen extends Array {
     }
 
     put(cursor, token) {
-        this[cursor.line].insert(cursor.col, token)
+        const line = this[cursor.line]
+        const tokens = JSON.parse(JSON.stringify(line.tokens))
+        line.insert(cursor.col, token)
+        if (line.getText().length > this.cols) {
+            console.log('Screen.put', { cursor, token })
+            console.log('Line', tokens)
+            throw new Error('Invalid length')
+        }
+    }
+
+    scroll(region, count) {
+        console.log('scrolling')
+        const top    = region.top
+        const bottom = region.bottom + 1
+        const left   = region.left
+        const right  = region.right + 1
+        const horizontalLength = right - left
+        const verticalLength = bottom - top
+
+        if (count > 0) {
+            const destinationTop = top - count
+            const destinationBottom = bottom - count
+
+            for (let i = 0, line = destinationTop; line < destinationBottom; line++, i++) {
+                if (line < top)
+                    continue
+                const sourceIndex = top + i
+                const currentLine = this[line]
+                const sourceLine = this[sourceIndex]
+                const tokens = sourceLine ? sourceLine.slice(left, right) : [{ text: ' '.repeat(horizontalLength) }]
+                currentLine.insertTokens(left, tokens)
+            }
+        }
+        else /* if (count < 0) */ {
+            const destinationTop = top + count
+            const destinationBottom = bottom + count
+
+            debugger
+            for (let i = 0, line = destinationBottom; line >= destinationTop; line--, i++) {
+                const sourceIndex = top + verticalLength - i - 1
+                if (sourceIndex > bottom || line < 0)
+                    continue
+                const currentLine = this[line]
+                const sourceLine = this[sourceIndex]
+                const tokens = sourceLine ? sourceLine.slice(left, right) : [{ text: ' '.repeat(horizontalLength) }]
+                console.log({ i, line, destinationTop, destinationBottom })
+                currentLine.insertTokens(left, tokens)
+            }
+        }
+        console.log('scrolled')
+    }
+
+    clearLine(line, col = 0) {
+        this[line].clear(col)
+    }
+
+    clearAll() {
+        for (let i = 0; i < this.length; i++) {
+            this[i].clear()
+        }
     }
 
     getText(cursor) {
         let text = (
-            '╭' + '─'.repeat(this.cols) + '╮\n'
-          + this.map(line => '│' + line.getText() + '│').join('\n')
-          + '\n╰' + '─'.repeat(this.cols) + '╯\n'
+            '   ╭' + '─'.repeat(this.cols) + '╮\n'
+          + this.map((line, i) =>
+                String(i).padEnd(2, ' ') + ' │' + line.getText() + '│').join('\n')
+          + '\n   ╰' + '─'.repeat(this.cols) + '╯\n'
         )
         if (cursor) {
-            const index = (cursor.line + 1) * (this.cols + 2) + cursor.col + 2
-            text = text.slice(0, index) + '#' + text.slice(index + 1)
+            const index = (cursor.line + 1) * (this.cols + 6) + cursor.col + 4
+            text = text.slice(0, index) + '█' + text.slice(index + 1)
         }
         return text
     }

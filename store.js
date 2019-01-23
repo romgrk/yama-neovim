@@ -79,7 +79,7 @@ module.exports = class NeovimStore extends EventEmitter {
      * title: string;
      * icon_path: string;
      * wheel_scrolling: ScreenWheel;
-     * scroll_region: Region;
+     * scrollRegion: Region;
      * dispatcher: Dispatcher<ActionType>;
      * focused: boolean;
      * line_height: number;
@@ -125,7 +125,7 @@ module.exports = class NeovimStore extends EventEmitter {
         this.title = '';
         this.icon_path = '';
         // this.wheel_scrolling = new ScreenWheel(this);
-        this.scroll_region = {
+        this.scrollRegion = {
             left: 0,
             right: 0,
             top: 0,
@@ -187,10 +187,12 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.ClearEOL: {
+                this.screen.clearLine(this.cursor.line)
                 this.emit('clear-eol');
                 break;
             }
             case Kind.ClearAll: {
+                this.screen.clearAll(this.cursor.line)
                 this.emit('clear-all');
                 this.cursor = {
                     line: 0,
@@ -200,12 +202,12 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.ScrollScreen: {
-                this.emit('screen-scrolled', action.cols);
+                this.screen.scroll(this.scrollRegion, action.count)
+                this.emit('screen-scrolled', action.count);
                 break;
             }
             case Kind.SetScrollRegion: {
-                this.scroll_region = action.region;
-                console.log('Region is set: ', this.scroll_region);
+                this.scrollRegion = action.region;
                 this.emit('scroll-region-updated');
                 break;
             }
@@ -423,7 +425,7 @@ module.exports = class NeovimStore extends EventEmitter {
         this.screen.resize(lines, cols)
         this.size.lines = lines;
         this.size.cols = cols;
-        this.scroll_region = {
+        this.scrollRegion = {
             top: 0,
             left: 0,
             right: cols - 1,

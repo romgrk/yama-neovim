@@ -319,10 +319,10 @@ exports.wheelScroll = function wheelScroll(event) {
     };
 }
 
-exports.scrollScreen = function scrollScreen(cols) {
+exports.scrollScreen = function scrollScreen(count) {
     return {
         type: Kind.ScrollScreen,
-        cols,
+        count,
     };
 }
 

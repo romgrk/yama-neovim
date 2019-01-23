@@ -13,6 +13,40 @@ describe('Line', () => {
         expect(text).toBe('aaaabbbbccccdddd                                            ')
     })
 
+    describe('.slice(start, end)', () => {
+        test('empty line', () => {
+            const line = new Line(80, [])
+            const tokens = line.slice(10, 20)
+
+            expect(line.tokens).toEqual([
+                { text: '          ', attr: null },
+            ])
+        })
+
+        test('non-empty line', () => {
+            const line = new Line(80, [ { text: 'a'.repeat(20) } ])
+            const tokens = line.slice(10, 30)
+
+            expect(tokens).toEqual([
+                { text: 'a'.repeat(10) },
+                { text: ' '.repeat(10), attr: null },
+            ])
+        })
+
+        test('inside tokens', () => {
+            const line = new Line(80, [
+                { text: 'first_token' },
+                { text: 'second_token' },
+            ])
+            const tokens = line.slice(6, 17)
+
+            expect(tokens).toEqual([
+                { text: 'token' },
+                { text: 'second' }
+            ])
+        })
+    })
+
     describe('.insert(position, token)', () => {
         test('at tokens end', () => {
             const line = new Line(80, [ { text: 'aaaa' } ])
@@ -117,7 +151,63 @@ describe('Line', () => {
             ])
         })
 
+        test('regression: insert at token start', () => {
+            const line = new Line(50, [
+                { text: ':', attr: { fg: 'white' } },
+                { text: 'l', attr: { fg: 'white' } },
+                { text: 's', attr: { fg: 'white' } },
+                { text: '                                     ', attr: { fg: 'white' } }
+            ])
+
+            const token = {
+                text: '1 %a   "[No Name]"                    line 1',
+                attr: { fg: 'white' }
+            }
+            line.insert(0, token)
+
+            expect(line.tokens).toEqual([
+                { text: '1 %a   "[No Name]"                    line 1', attr: { fg: 'white' } }
+            ])
+        })
     })
+
+    describe('.insertTokens(position, tokens)', () => {
+        test('inside line', () => {
+            const line = new Line(80, [
+                { text: 'a'.repeat(80) }
+            ])
+            const tokens = [
+                { text: 'bbbb' },
+                { text: 'cccc' },
+            ]
+            line.insertTokens(10, tokens)
+
+            expect(line.tokens).toEqual([
+                { text: 'aaaaaaaaaa' },
+                { text: 'bbbb' },
+                { text: 'cccc' },
+                { text: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+            ])
+        })
+
+        test('replace line', () => {
+            const line = new Line(50, [
+                { text: ':' },
+                { text: 'l' },
+                { text: 's' },
+                { text: ' '.repeat(47) },
+            ])
+            const tokens = [
+                { text: 'b'.repeat(50) },
+            ]
+            line.insertTokens(0, tokens)
+
+            expect(line.tokens).toEqual([
+                { text: 'b'.repeat(50) },
+            ])
+        })
+    })
+
 
     describe('.setLength(length)', () => {
         test('with larger than current', () => {

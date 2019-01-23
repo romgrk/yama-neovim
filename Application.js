@@ -4,6 +4,7 @@
 
 
 const child_process = require('child_process')
+const chalk = require('chalk')
 const { attach } = require('promised-neovim-client')
 
 const Action = require('./actions.js')
@@ -11,10 +12,18 @@ const Store = require('./store.js')
 
 class Application {
 
-  constructor() {
+  constructor(onUpdateCallback = () => {}) {
     this.store = new Store()
-    this.store.on('put', () => console.log(this.store.screen.getText(this.store.cursor)))
-    this.store.on('cursor', () => console.log(this.store.screen.getText(this.store.cursor)))
+    const onUpdate = () => {
+      const text = this.store.screen.getText(this.store.cursor)
+      console.log(text)
+      onUpdateCallback(text)
+    }
+    this.store.on('put', onUpdate)
+    this.store.on('cursor', onUpdate)
+    this.store.on('clear', onUpdate)
+    this.store.on('eol_clear', onUpdate)
+    this.store.on('scroll', onUpdate)
   }
 
   start(command, argv, lines, columns) {
@@ -61,7 +70,11 @@ class Application {
 
   onNotified(method, args) {
       if (method === 'redraw') {
-          this.redraw(args);
+          try { // FIXME(remove)
+            this.redraw(args);
+          } catch (err) {
+            console.error(err);
+          }
       } else {
           // User defined notifications are passed here.
           console.log('Unknown method', method, args);
@@ -82,10 +95,13 @@ class Application {
 
   redraw(events) {
     const d = this.store.dispatcher;
+
     for (const e of events) {
       const name = e[0];
       const args = e[1];
+
       console.log(name, e.slice(1))
+
       switch (name) {
           case 'put':
               e.shift();
@@ -99,15 +115,12 @@ class Application {
           case 'highlight_set':
               e.shift();
 
-              // Note:
-              // [[{highlight_set}], [], [{highlight_set}], ...]
-              //   -> [{highlight_set}, {highlight_set}, ...]
+              // [[{highlight_set}], [], [{highlight_set}], ...] -> [{highlight_set}, {highlight_set}, ...]
               const highlights = [].concat.apply([], e);
 
-              // Note:
-              // [{highlight_set}, {highlight_set}, ...]
-              //   -> {merged highlight_set}
+              // [{highlight_set}, {highlight_set}, ...] -> {merged highlight_set}
               highlights.unshift({});
+
               const merged_highlight = Object.assign.apply(Object, highlights);
 
               d.dispatch(Action.highlight(merged_highlight));
@@ -186,7 +199,7 @@ class Application {
               d.dispatch(Action.setIcon(args[0]));
               break;
           default:
-              console.warn('Unhandled event: ' + name, args);
+              console.warn(chalk.bold.red('Unhandled event: ') + name, args);
               break;
       }
     }
