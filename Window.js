@@ -138,22 +138,23 @@ module.exports = class Window extends EventEmitter {
 
     const fontFamily = 'Fantasque Sans Mono'
     const defaultColor = 'white'
-    const defaultBackgroundColor = '#2c3133'
+    const defaultBackgroundColor = this.store.bg_color // '#2c3133'
 
-    const fontSize = 12
+    const fontSize = 14
     const lineHeight = 16
 
     context.setFontSize(fontSize)
 
     const extents = context.textExtents('X')
-    console.log({
-      xAdvance: extents.xAdvance,
-      yAdvance: extents.yAdvance,
-      width:    extents.width,
-      height:   extents.height,
-      xBearing: extents.xBearing,
-      yBearing: extents.yBearing,
-    }) 
+    const xAdvance = extents.xAdvance
+    /* console.log({
+     *   xAdvance: extents.xAdvance,
+     *   yAdvance: extents.yAdvance,
+     *   width:    extents.width,
+     *   height:   extents.height,
+     *   xBearing: extents.xBearing,
+     *   yBearing: extents.yBearing,
+     * }) */
 
     const screen = this.store.screen
 
@@ -173,6 +174,12 @@ module.exports = class Window extends EventEmitter {
       face: 'monospace'
     } */
 
+    let currentY = 20
+
+    setContextColorFromHex(context, colorToHex(this.store.bg_color))
+    context.rectangle(0, currentY, screen.cols * xAdvance, screen.length * lineHeight)
+    context.fill()
+
     for (let i = 0; i < screen.length; i++) {
       const line = screen[i]
       const tokens = line.tokens
@@ -186,20 +193,28 @@ module.exports = class Window extends EventEmitter {
         const fg = colorToHex(attr && attr.fg ? attr.fg : defaultColor)
         const bg = colorToHex(attr && attr.bg ? attr.bg : defaultBackgroundColor)
 
-        setContextColorFromHex(context, fg)
+        const width = token.text.length * xAdvance
+
         context.selectFontFace(
           fontFamily,
           attr.italic ? Cairo.FontSlant.ITALIC : Cairo.FontSlant.NORMAL,
           attr.bold   ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL
         )
 
-        context.moveTo(currentX, i * lineHeight)
-        context.showText(token.text)
-        context.stroke()
-        console.log({ line: i, text: token.text, color: fg, x: currentX, y: i * extents.yBearing })
+        setContextColorFromHex(context, bg)
+        context.rectangle(currentX, currentY, width, lineHeight)
+        context.fill()
 
-        currentX += token.text.length * extents.xAdvance
+        setContextColorFromHex(context, fg)
+        context.moveTo(currentX, currentY - extents.yBearing)
+        context.showText(token.text)
+
+        // console.log({ line: i, text: token.text, color: fg, x: currentX, y: currentY })
+
+        currentX += width
       }
+
+      currentY += lineHeight
     }
 
     return true
