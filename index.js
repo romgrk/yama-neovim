@@ -2,17 +2,22 @@
  * index.js
  */
 
+const gi = require('node-gtk')
+const Gtk = gi.require('Gtk', '3.0')
+const Gdk = gi.require('Gdk', '3.0')
+
+gi.startLoop()
+Gtk.init([])
+Gdk.init([])
+
 const Application = require('./Application.js')
 const Window = require('./Window.js')
 const KeyEvent = require('./key-event.js')
+const Store = require('./store.js')
 
-const window = new Window()
-
-const onUpdate = text => {
-  window.setText(text)
-}
-
-const app = new Application(onUpdate)
+const store = new Store()
+const app = new Application(store)
+const window = new Window(store, app)
 
 
 window.on('key-press', (event, original) => {

@@ -8,17 +8,11 @@ const chalk = require('chalk')
 const { attach } = require('promised-neovim-client')
 
 const Action = require('./actions.js')
-const Store = require('./store.js')
 
 class Application {
 
-  constructor(onUpdateCallback = () => {}) {
-    this.store = new Store()
-    this.store.on('flush', () => {
-      const text = this.store.screen.getText(this.store.cursor)
-      console.log(text)
-      onUpdateCallback(text)
-    })
+  constructor(store) {
+    this.store = store
   }
 
   start(command, argv, lines, columns) {

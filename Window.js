@@ -4,22 +4,30 @@
 
 
 const EventEmitter = require('events')
+const colornames = require('colornames')
 const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
 const Cairo = gi.require('cairo')
 
 const KeyEvent = require('./key-event.js')
 
-gi.startLoop()
-Gtk.init()
+const EMPTY_OBJECT = {}
 
 module.exports = class Window extends EventEmitter {
-  constructor() {
+  constructor(store, application) {
     super()
 
+    this.application = application
+    this.store = store
+
+    this.onStoreFlush = this.onStoreFlush.bind(this)
     this.onKeyPressEvent = this.onKeyPressEvent.bind(this)
     this.onDraw = this.onDraw.bind(this)
 
+    this.initialize()
+  }
+
+  initialize() {
 
     // Main program window
     this.window = new Gtk.Window({
@@ -112,10 +120,88 @@ module.exports = class Window extends EventEmitter {
     // window close event: returning true has the semantic of preventing the default behavior:
     // in this case, it would prevent the user from closing the window if we would return `true`
     this.window.on('delete-event', () => false)
+
+    // Start listening to events
+    this.store.on('flush', this.onStoreFlush)
   }
 
-  onDraw(...args) {
-    console.log(['onDraw', ...args])
+  onStoreFlush() {
+    this.drawingArea.queueDraw()
+
+    const text = this.store.screen.getText()
+    this.setText(text)
+  }
+
+  onDraw(context) {
+
+    context.setSourceRgb(1.0, 1.0, 1.0)
+
+    const fontFamily = 'Fantasque Sans Mono'
+    const defaultColor = 'white'
+    const defaultBackgroundColor = '#2c3133'
+
+    const fontSize = 12
+    const lineHeight = 16
+
+    context.setFontSize(fontSize)
+
+    const extents = context.textExtents('X')
+    console.log({
+      xAdvance: extents.xAdvance,
+      yAdvance: extents.yAdvance,
+      width:    extents.width,
+      height:   extents.height,
+      xBearing: extents.xBearing,
+      yBearing: extents.yBearing,
+    }) 
+
+    const screen = this.store.screen
+
+    /* {
+      fg: 'black',
+      bg: 'white',
+      sp: 'white',
+      bold: true,
+      italic: undefined,
+      underline: undefined,
+      undercurl: undefined,
+      draw_width: 1,
+      draw_height: 1,
+      width: 1,
+      height: 1,
+      specified_px: 1,
+      face: 'monospace'
+    } */
+
+    for (let i = 0; i < screen.length; i++) {
+      const line = screen[i]
+      const tokens = line.tokens
+
+      let currentX = 0
+
+      for (let j = 0; j < tokens.length; j++) {
+        const token = tokens[j]
+        const attr = token.attr || EMPTY_OBJECT
+
+        const fg = colorToHex(attr && attr.fg ? attr.fg : defaultColor)
+        const bg = colorToHex(attr && attr.bg ? attr.bg : defaultBackgroundColor)
+
+        setContextColorFromHex(context, fg)
+        context.selectFontFace(
+          fontFamily,
+          attr.italic ? Cairo.FontSlant.ITALIC : Cairo.FontSlant.NORMAL,
+          attr.bold   ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL
+        )
+
+        context.moveTo(currentX, i * lineHeight)
+        context.showText(token.text)
+        context.stroke()
+        console.log({ line: i, text: token.text, color: fg, x: currentX, y: i * extents.yBearing })
+
+        currentX += token.text.length * extents.xAdvance
+      }
+    }
+
     return true
   }
 
@@ -161,3 +247,24 @@ function countUtf8Bytes(s){
   return b
 }
 
+function colorToHex(color) {
+  if (color.charAt(0) === '#')
+    return color
+  return colornames(color)
+}
+
+function gdkColorToHex(color) {
+  return (
+    '#'
+    + (color.red   * 255).toFixed(0).toString(16)
+    + (color.green * 255).toFixed(0).toString(16)
+    + (color.blue  * 255).toFixed(0).toString(16)
+  )
+}
+
+function setContextColorFromHex(context, hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  context.setSourceRgb(r, g, b)
+}
