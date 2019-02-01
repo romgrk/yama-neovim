@@ -190,8 +190,8 @@ module.exports = class Window extends EventEmitter {
         const token = tokens[j]
         const attr = token.attr || EMPTY_OBJECT
 
-        const fg = colorToHex(attr && attr.fg ? attr.fg : defaultColor)
-        const bg = colorToHex(attr && attr.bg ? attr.bg : defaultBackgroundColor)
+        const fg = colorToHex(attr.fg ? attr.fg : defaultColor)
+        const bg = colorToHex(attr.bg ? attr.bg : defaultBackgroundColor)
 
         const width = token.text.length * xAdvance
 
