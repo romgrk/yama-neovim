@@ -10,8 +10,8 @@ gi.startLoop()
 Gtk.init([])
 Gdk.init([])
 
-const Application = require('./Application.js')
-const Window = require('./Window.js')
+const Application = require('./application.js')
+const Window = require('./window.js')
 const KeyEvent = require('./key-event.js')
 const Store = require('./store.js')
 

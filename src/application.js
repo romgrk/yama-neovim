@@ -1,5 +1,5 @@
 /*
- * Application.js
+ * application.js
  */
 
 

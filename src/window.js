@@ -1,5 +1,5 @@
 /*
- * Window.js
+ * window.js
  */
 
 
