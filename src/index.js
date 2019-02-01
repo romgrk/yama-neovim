@@ -32,7 +32,12 @@ window.on('key-press', (event, original) => {
 })
 
 
-app.start('nvim', ['-u', 'NORC'], 20, 50)
+app.start(
+  'nvim',
+  ['--embed', '--headless', '-u', 'NORC'],
+  20,
+  50
+)
 
 window.show()
 
