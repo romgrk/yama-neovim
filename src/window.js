@@ -123,18 +123,28 @@ module.exports = class Window extends EventEmitter {
 
     // Start listening to events
     this.store.on('flush', this.onStoreFlush)
+
+    // Cursor blink
+    this.blinkInterval = setInterval(() => this.blink(), 600)
+  }
+
+  blink() {
+    this.blinkValue = !this.blinkValue
+    this.drawingArea.queueDraw()
   }
 
   onStoreFlush() {
     this.drawingArea.queueDraw()
 
-    const text = this.store.screen.getText()
+    const text = this.store.screen.getText(this.store.cursor)
     this.setText(text)
   }
 
   onDraw(context) {
 
-    context.setSourceRgb(1.0, 1.0, 1.0)
+    const screen = this.store.screen
+    const cursor = this.store.cursor
+    const mode = this.store.mode
 
     const fontFamily = 'Fantasque Sans Mono'
     const defaultColor = 'white'
@@ -146,17 +156,28 @@ module.exports = class Window extends EventEmitter {
     context.setFontSize(fontSize)
 
     const extents = context.textExtents('X')
-    const xAdvance = extents.xAdvance
-    /* console.log({
-     *   xAdvance: extents.xAdvance,
-     *   yAdvance: extents.yAdvance,
-     *   width:    extents.width,
-     *   height:   extents.height,
-     *   xBearing: extents.xBearing,
-     *   yBearing: extents.yBearing,
-     * }) */
+    const fontExtents = context.fontExtents()
 
-    const screen = this.store.screen
+    const characterWidth = extents.xAdvance
+    const totalWidth = characterWidth * screen.cols
+
+    console.log({
+      extents: {
+        xAdvance: extents.xAdvance,
+        yAdvance: extents.yAdvance,
+        width:    extents.width,
+        height:   extents.height,
+        xBearing: extents.xBearing,
+        yBearing: extents.yBearing,
+      },
+      fontExtents: {
+        ascent:      fontExtents.ascent,
+        descent:     fontExtents.descent,
+        height:      fontExtents.height,
+        maxXAdvance: fontExtents.maxXAdvance,
+        maxYAdvance: fontExtents.maxYAdvance,
+      },
+    })
 
     /* {
       fg: 'black',
@@ -174,12 +195,15 @@ module.exports = class Window extends EventEmitter {
       face: 'monospace'
     } */
 
-    let currentY = 20
+    const originY = 20
+    let currentY = originY
 
+    /* Draw background */
     setContextColorFromHex(context, colorToHex(this.store.bg_color))
-    context.rectangle(0, currentY, screen.cols * xAdvance, screen.length * lineHeight)
+    context.rectangle(0, currentY, screen.cols * characterWidth, screen.length * lineHeight)
     context.fill()
 
+    /* Draw tokens */
     for (let i = 0; i < screen.length; i++) {
       const line = screen[i]
       const tokens = line.tokens
@@ -193,7 +217,7 @@ module.exports = class Window extends EventEmitter {
         const fg = colorToHex(attr.fg ? attr.fg : defaultColor)
         const bg = colorToHex(attr.bg ? attr.bg : defaultBackgroundColor)
 
-        const width = token.text.length * xAdvance
+        const width = token.text.length * characterWidth
 
         context.selectFontFace(
           fontFamily,
@@ -209,9 +233,68 @@ module.exports = class Window extends EventEmitter {
         context.moveTo(currentX, currentY - extents.yBearing)
         context.showText(token.text)
 
-        // console.log({ line: i, text: token.text, color: fg, x: currentX, y: currentY })
-
         currentX += width
+      }
+
+      currentY += lineHeight
+    }
+
+    /* Draw cursor */
+    if (this.blinkValue) {
+      context.setSourceRgba(0.8, 0.8, 0.8, 1)
+
+      if (mode === 'insert' || mode === 'cmdline_normal') {
+        context.setLineWidth(2)
+        context.moveTo(cursor.col * characterWidth, originY + cursor.line * lineHeight)
+        context.lineTo(cursor.col * characterWidth, originY + (cursor.line + 1) * lineHeight)
+        context.stroke()
+      }
+      else {
+        const token = screen.getTokenAt(cursor.line, cursor.col) || { text: '' }
+
+        const attr = token.attr || EMPTY_OBJECT
+
+        const fg = colorToHex(attr.fg ? attr.fg : defaultColor)
+        const bg = colorToHex(attr.bg ? attr.bg : defaultBackgroundColor)
+
+        context.selectFontFace(
+          fontFamily,
+          attr.italic ? Cairo.FontSlant.ITALIC : Cairo.FontSlant.NORMAL,
+          attr.bold   ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL
+        )
+
+        setContextColorFromHex(context, fg)
+        context.rectangle(cursor.col * characterWidth, originY + cursor.line * lineHeight, characterWidth, lineHeight)
+        context.fill()
+
+        setContextColorFromHex(context, bg)
+        context.moveTo(cursor.col * characterWidth, originY + (cursor.line + 1) * lineHeight)
+        context.showText(token.text)
+      }
+    }
+
+
+    /* Draw grid */
+
+    currentY = originY
+
+    context.setSourceRgba(1.0, 0, 0, 0.8)
+    context.setLineWidth(1)
+
+    for (let i = 0; i < screen.length; i++) {
+
+      context.moveTo(0, currentY)
+      context.lineTo(totalWidth, currentY)
+      context.stroke()
+
+      let currentX = 0
+
+      for (let j = 0; j < screen.cols; j++) {
+        context.moveTo(currentX, currentY)
+        context.lineTo(currentX, currentY + lineHeight)
+        context.stroke()
+
+        currentX += characterWidth
       }
 
       currentY += lineHeight
@@ -234,6 +317,7 @@ module.exports = class Window extends EventEmitter {
   }
 
   quit() {
+    clearInterval(this.blinkInterval)
     Gtk.mainQuit()
     process.exit()
     // FIXME(quit neovim)

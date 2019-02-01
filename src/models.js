@@ -286,6 +286,11 @@ class Screen extends Array {
         }
     }
 
+    getTokenAt(lnum, col) {
+        const line = this[lnum]
+        return line.slice(col, col + 1)[0]
+    }
+
     getText(cursor) {
         let text = (
             '   ╭' + '─'.repeat(this.cols) + '╮\n'
