@@ -3,7 +3,7 @@
  */
 /* global describe, test, it, expect */
 
-const { Token, Line } = require('../models.js')
+const { Token, Line } = require('./models.js')
 
 describe('Line', () => {
 
