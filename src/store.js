@@ -33,12 +33,7 @@ const { Screen, Line } = require('./models.js')
  *     italic: boolean;
  *     underline: boolean;
  *     undercurl: boolean;
- *     draw_width: number;
- *     draw_height: number;
- *     width: number;
- *     height: number;
- *     face: string;
- *     specified_px: number;
+ *     reverse: boolean;
  * } */
 
 // export type DispatcherType = Dispatcher<ActionType>;
@@ -80,7 +75,7 @@ module.exports = class NeovimStore extends EventEmitter {
             width: 0,
             height: 0,
         }
-        this.fontFamily = 'FuraMonoForPowerline Nerd Font'
+        this.fontFamily = 'Fira Code Retina'
         this.fontSize = 16
         this.lineHeight = 18
         this.fontAttributes = {
@@ -91,11 +86,7 @@ module.exports = class NeovimStore extends EventEmitter {
             italic: false,
             underline: false,
             undercurl: false,
-            draw_width: 1,
-            draw_height: 1,
-            width: 1,
-            height: 1,
-            specified_px: 1,
+            reverse: false,
         }
         this.fg_color = 'white'
         this.bg_color = 'black'
@@ -156,13 +147,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 this.fontAttributes.italic = hl.italic;
                 this.fontAttributes.underline = hl.underline;
                 this.fontAttributes.undercurl = hl.undercurl;
-                if (hl.reverse === true) {
-                    this.fontAttributes.fg = colorToString(hl.background, this.bg_color);
-                    this.fontAttributes.bg = colorToString(hl.foreground, this.fg_color);
-                } else {
-                    this.fontAttributes.fg = colorToString(hl.foreground, this.fg_color);
-                    this.fontAttributes.bg = colorToString(hl.background, this.bg_color);
-                }
+                this.fontAttributes.reverse = hl.reverse;
                 this.fontAttributes.sp = colorToString(hl.special, this.sp_color || this.fg_color);
                 console.log('Highlight is updated: ', this.fontAttributes);
                 break;
@@ -200,7 +185,7 @@ module.exports = class NeovimStore extends EventEmitter {
             }
             case Kind.Resize: {
                 if (this.resize(action.lines, action.cols)) {
-                    this.emit('resize');
+                    this.emit('resize', action.lines, action.cols);
                 }
                 break;
             }

@@ -33,6 +33,8 @@ module.exports = class Window extends EventEmitter {
     this.cellWidth   = 10
     this.cellHeight  = 15
 
+    this.cursorThickness = 3
+
     this.initialize()
   }
 
@@ -171,10 +173,13 @@ module.exports = class Window extends EventEmitter {
 
   drawText(line, col, tokens, context) {
     const markups = []
+
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i]
-      markups.push(`<span ${this.getPangoAttributes(token.attr)}>${token.text}</span>`)
+      const text = token.text.replace(/<|>/g, m => m === '<' ? '&lt;' : '&gt;')
+      markups.push(`<span ${this.getPangoAttributes(token.attr || {})}>${text}</span>`)
     }
+
     this.pangoLayout.setMarkup(markups.join(''))
 
     // Draw text
@@ -186,6 +191,78 @@ module.exports = class Window extends EventEmitter {
     PangoCairo.showLayout(context, this.pangoLayout)
   }
 
+  drawCursor(context) {
+    context.setSourceRgba(0.8, 0.8, 0.8, 1)
+
+    const mode = this.store.mode
+
+    if (mode === 'insert' || mode === 'cmdline_normal') {
+      this.drawCursorI(context, true)
+    }
+    else if (mode === 'normal') {
+      this.drawCursorBlock(context, true)
+    }
+    else if (mode === 'visual') {
+      this.drawCursorBlock(context, false)
+    }
+    else if (mode === 'replace' || mode === 'operator') {
+      this.drawCursorUnderline(context, false)
+    }
+    else {
+      this.drawCursorBlock(context, true)
+    }
+  }
+
+  drawCursorUnderline(context, blink) {
+    if (blink && !this.blinkValue)
+      return
+
+    const cursor = this.store.cursor
+
+    context.rectangle(
+      cursor.col * this.cellWidth,
+      (cursor.line + 1) * this.cellHeight - this.cursorThickness,
+      this.cellWidth,
+      this.cursorThickness
+    )
+    context.fill()
+  }
+
+  drawCursorI(context, blink) {
+    if (blink && !this.blinkValue)
+      return
+
+    const cursor = this.store.cursor
+
+    context.rectangle(
+      cursor.col * this.cellWidth,
+      cursor.line * this.cellHeight,
+      this.cursorThickness,
+      this.cellHeight
+    )
+    context.fill()
+  }
+
+  drawCursorBlock(context, blink) {
+    if (blink && !this.blinkValue)
+      return
+
+    const screen = this.store.screen
+    const cursor = this.store.cursor
+
+    const token = screen.getTokenAt(cursor.line, cursor.col) || { text: '' }
+
+    const text = token.text || ' '
+    const attr = token.attr || EMPTY_OBJECT
+
+    const fg = colorToHex(attr.fg ? attr.fg : this.store.fg_color)
+    const bg = colorToHex(attr.bg ? attr.bg : this.store.bg_color)
+
+    const cursorToken = { text, attr: { ...attr, fg: bg, bg: fg } }
+
+    this.drawText(cursor.line, cursor.col, [cursorToken], context)
+  }
+
   getPangoAttributes(attr) {
     /* {
       fg: 'black',
@@ -195,12 +272,7 @@ module.exports = class Window extends EventEmitter {
       italic: undefined,
       underline: undefined,
       undercurl: undefined,
-      draw_width: 1,
-      draw_height: 1,
-      width: 1,
-      height: 1,
-      specified_px: 1,
-      face: 'monospace'
+      reverse: undefined,
     } */
 
     const pangoAttrs = {
@@ -231,7 +303,7 @@ module.exports = class Window extends EventEmitter {
       })
     }
 
-    return Object.keys(pangoAttrs).map(key => `${key}=${pangoAttrs[key]}`).join(' ')
+    return Object.keys(pangoAttrs).map(key => `${key}="${pangoAttrs[key]}"`).join(' ')
   }
 
   setText(string) {
@@ -258,13 +330,10 @@ module.exports = class Window extends EventEmitter {
     this.boldSpacing = normalWidth - boldWidth
     const [cellWidth, cellHeight] = pixels
     // calculate the total pixel width/height of the drawing area
-    this.totalWidth = cellWidth * cols
+    this.totalWidth  = cellWidth * cols
     this.totalHeight = cellHeight * lines
 
-    const gdkwin = this.drawingArea.getWindow()
-    const content = Cairo.Content.COLOR
-
-    this.cairoSurface = gdkwin.createSimilarSurface(content,
+    this.cairoSurface = new Cairo.ImageSurface(Cairo.Format.RGB24,
                                                     this.totalWidth,
                                                     this.totalHeight)
     this.cairoContext = new Cairo.Context(this.cairoSurface)
@@ -279,150 +348,52 @@ module.exports = class Window extends EventEmitter {
   onDraw(context) {
 
     const screen = this.store.screen
-    const cursor = this.store.cursor
     const mode = this.store.mode
-
-    const defaultColor = this.store.fg_color
-    const defaultBackgroundColor = this.store.bg_color // '#2c3133'
 
     const {fontFamily, fontSize, lineHeight} = this.store
 
-    /* {
-      fg: 'black',
-      bg: 'white',
-      sp: 'white',
-      bold: true,
-      italic: undefined,
-      underline: undefined,
-      undercurl: undefined,
-      draw_width: 1,
-      draw_height: 1,
-      width: 1,
-      height: 1,
-      specified_px: 1,
-      face: 'monospace'
-    } */
-
     context.setFontSize(fontSize)
-
-
-    const originY = 20
-    let currentY = originY
 
     /* Draw background */
     setContextColorFromHex(context, colorToHex(this.store.bg_color))
-    console.log(0, currentY, this.totalWidth, this.totalHeight)
-    context.rectangle(0, currentY, this.totalWidth, this.totalHeight)
+    context.rectangle(0, 0, this.totalWidth, this.totalHeight)
     context.fill()
 
     /* Draw tokens */
     for (let i = 0; i < screen.length; i++) {
       const line = screen[i]
       const tokens = line.tokens
-
-      this.drawText(line, 0, tokens, context)
-
-/*       let currentX = 0
- * 
- *       for (let j = 0; j < tokens.length; j++) {
- *         const token = tokens[j]
- *         const attr = token.attr || EMPTY_OBJECT
- * 
- *         const fg = colorToHex(attr.fg ? attr.fg : defaultColor)
- *         const bg = colorToHex(attr.bg ? attr.bg : defaultBackgroundColor)
- * 
- *         const width = token.text.length * this.cellWidth
- * 
- *         context.selectFontFace(
- *           fontFamily,
- *           attr.italic ? Cairo.FontSlant.ITALIC : Cairo.FontSlant.NORMAL,
- *           attr.bold   ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL
- *         )
- * 
- *         setContextColorFromHex(context, bg)
- *         context.rectangle(currentX, currentY, width, lineHeight)
- *         context.fill()
- * 
- *         setContextColorFromHex(context, fg)
- *         context.moveTo(currentX, currentY - this.cellHeight)
- *         context.showText(token.text)
- * 
- *         currentX += width
- *       } */
-
-      currentY += lineHeight
+      this.drawText(i, 0, tokens, context)
     }
 
     /* Draw cursor */
-    if (this.blinkValue) {
-      context.setSourceRgba(0.8, 0.8, 0.8, 1)
-
-      if (mode === 'insert' || mode === 'cmdline_normal') {
-        context.setLineWidth(2)
-        context.moveTo(cursor.col * this.cellWidth, originY + cursor.line * lineHeight)
-        context.lineTo(cursor.col * this.cellWidth, originY + (cursor.line + 1) * lineHeight)
-        context.stroke()
-      }
-      else {
-        const token = screen.getTokenAt(cursor.line, cursor.col) || { text: '' }
-
-        const attr = token.attr || EMPTY_OBJECT
-
-        const fg = colorToHex(attr.fg ? attr.fg : defaultColor)
-        const bg = colorToHex(attr.bg ? attr.bg : defaultBackgroundColor)
-
-        context.selectFontFace(
-          fontFamily,
-          attr.italic ? Cairo.FontSlant.ITALIC : Cairo.FontSlant.NORMAL,
-          attr.bold   ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL
-        )
-
-        setContextColorFromHex(context, fg)
-        console.log(
-          cursor.col * this.cellWidth,
-          originY + cursor.line * lineHeight,
-          this.cellWidth,
-          lineHeight
-        )
-        context.rectangle(
-          cursor.col * this.cellWidth,
-          originY + cursor.line * lineHeight,
-          this.cellWidth,
-          lineHeight
-        )
-        context.fill()
-
-        setContextColorFromHex(context, bg)
-        context.moveTo(cursor.col * this.cellWidth, originY + (cursor.line + 1) * lineHeight)
-        context.showText(token.text)
-      }
-    }
-
+    this.drawCursor(context)
 
     /* Draw grid */
+    if (false) {
+      let currentY = 0
 
-    currentY = originY
+      context.setSourceRgba(1.0, 0, 0, 0.8)
+      context.setLineWidth(1)
 
-    context.setSourceRgba(1.0, 0, 0, 0.8)
-    context.setLineWidth(1)
+      for (let i = 0; i < screen.length; i++) {
 
-    for (let i = 0; i < screen.length; i++) {
-
-      context.moveTo(0, currentY)
-      context.lineTo(this.totalWidth, currentY)
-      context.stroke()
-
-      let currentX = 0
-
-      for (let j = 0; j < screen.cols; j++) {
-        context.moveTo(currentX, currentY)
-        context.lineTo(currentX, currentY + lineHeight)
+        context.moveTo(0, currentY)
+        context.lineTo(this.totalWidth, currentY)
         context.stroke()
 
-        currentX += this.cellWidth
-      }
+        let currentX = 0
 
-      currentY += lineHeight
+        for (let j = 0; j < screen.cols; j++) {
+          context.moveTo(currentX, currentY)
+          context.lineTo(currentX, currentY + this.cellHeight)
+          context.stroke()
+
+          currentX += this.cellWidth
+        }
+
+        currentY += this.cellHeight
+      }
     }
 
     return true

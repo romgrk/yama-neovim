@@ -2,6 +2,7 @@
  * models.js
  */
 
+const isEqual = require('lodash.isequal')
 
 class Token {
     constructor(text, attr) {
@@ -14,6 +15,38 @@ class Line {
     constructor(length, tokens = []) {
         this.length = length
         this.tokens = tokens
+    }
+
+    setLength(length) {
+        if (this.length > length) {
+
+            let index
+            let charCount = 0
+
+            for (index = 0; index < this.tokens.length; index++) {
+                const token = this.tokens[index]
+                const tokenLength = token.text.length
+                const tokenEnd = charCount + tokenLength - 1
+
+                if (isInRange(length, charCount, tokenEnd)) {
+                    if (length > charCount) {
+                        const breakPoint = length - charCount
+                        const textBefore = token.text.slice(0, breakPoint)
+                        const textAfter  = token.text.slice(breakPoint)
+
+                        this.tokens.splice(index, 1,
+                            { ...token, text: textBefore },
+                            { ...token, text: textAfter })
+                        index += 1
+                    }
+                    this.tokens.splice(index, this.tokens.length - index)
+                    break
+                }
+
+                charCount += tokenLength
+            }
+        }
+        this.length = length
     }
 
     getText() {
@@ -31,7 +64,10 @@ class Line {
     slice(start, end) {
         const {startIndex, endIndex} = this._prepareSlice(start, end - start)
 
-        return this.tokens.slice(startIndex, endIndex + 1)
+        // FIXME(performance: implement this without mutation)
+        const result = this.tokens.slice(startIndex, endIndex + 1)
+        this._normalize()
+        return result
     }
 
     insert(position, token) {
@@ -60,6 +96,22 @@ class Line {
         const deleteCount = (endIndex + 1) - startIndex
 
         this.tokens.splice(startIndex, deleteCount)
+    }
+
+    _normalize() {
+        let i = 0
+        while (i < this.tokens.length - 1) {
+            const currentToken = this.tokens[i]
+            const nextToken    = this.tokens[i + 1]
+
+            if (isEqual(currentToken.attr, nextToken.attr)) {
+                const newToken = { text: currentToken.text + nextToken.text, attr: currentToken.attr }
+                this.tokens.splice(i, 2, newToken)
+                continue
+            }
+
+            i += 1
+        }
     }
 
     _prepareSlice(position, length) {
@@ -156,38 +208,6 @@ class Line {
         }
 
         return { startIndex, endIndex }
-    }
-
-    setLength(length) {
-        if (this.length > length) {
-
-            let index
-            let charCount = 0
-
-            for (index = 0; index < this.tokens.length; index++) {
-                const token = this.tokens[index]
-                const tokenLength = token.text.length
-                const tokenEnd = charCount + tokenLength - 1
-
-                if (isInRange(length, charCount, tokenEnd)) {
-                    if (length > charCount) {
-                        const breakPoint = length - charCount
-                        const textBefore = token.text.slice(0, breakPoint)
-                        const textAfter  = token.text.slice(breakPoint)
-
-                        this.tokens.splice(index, 1,
-                            { ...token, text: textBefore },
-                            { ...token, text: textAfter })
-                        index += 1
-                    }
-                    this.tokens.splice(index, this.tokens.length - index)
-                    break
-                }
-
-                charCount += tokenLength
-            }
-        }
-        this.length = length
     }
 }
 
