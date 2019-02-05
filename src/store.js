@@ -43,24 +43,6 @@ const { Screen, Line } = require('./models.js')
 
 // export type DispatcherType = Dispatcher<ActionType>;
 
-// Note: 0x001203 -> '#001203'
-function colorString(new_color, fallback) {
-    if (typeof new_color !== 'number' || new_color < 0) {
-        return fallback;
-    }
-
-    return (
-        '#' +
-        [16, 8, 0]
-            .map(shift => {
-                const mask = 0xff << shift;
-                const hex = ((new_color & mask) >> shift).toString(16);
-                return hex.length < 2 ? '0' + hex : hex;
-            })
-            .join('')
-    );
-}
-
 
 module.exports = class NeovimStore extends EventEmitter {
     /* dispatch_token: string;
@@ -90,14 +72,17 @@ module.exports = class NeovimStore extends EventEmitter {
      * cursor_blink_interval: number; */
 
     constructor() {
-        super();
-        this.dispatcher = new Dispatcher();
+        super()
+        this.dispatcher = new Dispatcher()
         this.size = {
             lines: 0,
             cols: 0,
             width: 0,
             height: 0,
-        };
+        }
+        this.fontFamily = 'FuraMonoForPowerline Nerd Font'
+        this.fontSize = 16
+        this.lineHeight = 18
         this.fontAttributes = {
             fg: 'white',
             bg: 'black',
@@ -111,34 +96,36 @@ module.exports = class NeovimStore extends EventEmitter {
             width: 1,
             height: 1,
             specified_px: 1,
-            face: 'monospace',
-        };
+        }
+        this.fg_color = 'white'
+        this.bg_color = 'black'
+        this.sp_color = 'blue'
         this.cursor = {
             line: 0,
             col: 0,
-        };
-        this.modeInfo = {};
-        this.mode = 'normal';
-        this.busy = false;
-        this.mouse_enabled = true;
-        this.dragging = null;
-        this.title = '';
-        this.icon_path = '';
-        // this.wheel_scrolling = new ScreenWheel(this);
+        }
+        this.modeInfo = {}
+        this.mode = 'normal'
+        this.busy = false
+        this.mouse_enabled = true
+        this.dragging = null
+        this.title = ''
+        this.icon_path = ''
+        // this.wheel_scrolling = new ScreenWheel(this)
         this.scrollRegion = {
             left: 0,
             right: 0,
             top: 0,
             bottom: 0,
-        };
-        this.focused = true;
-        this.line_height = 1.2;
-        this.alt_key_disabled = false;
-        this.meta_key_disabled = false;
-        this.cursor_draw_delay = 10;
-        this.blink_cursor = false;
-        this.cursor_blink_interval = 1000;
-        this.dispatch_token = this.dispatcher.register(this.receiveAction.bind(this));
+        }
+        this.focused = true
+        this.line_height = 1.2
+        this.alt_key_disabled = false
+        this.meta_key_disabled = false
+        this.cursor_draw_delay = 10
+        this.blink_cursor = false
+        this.cursor_blink_interval = 1000
+        this.dispatch_token = this.dispatcher.register(this.receiveAction.bind(this))
         this.screen = new Screen(0, 0)
     }
 
@@ -170,13 +157,13 @@ module.exports = class NeovimStore extends EventEmitter {
                 this.fontAttributes.underline = hl.underline;
                 this.fontAttributes.undercurl = hl.undercurl;
                 if (hl.reverse === true) {
-                    this.fontAttributes.fg = colorString(hl.background, this.bg_color);
-                    this.fontAttributes.bg = colorString(hl.foreground, this.fg_color);
+                    this.fontAttributes.fg = colorToString(hl.background, this.bg_color);
+                    this.fontAttributes.bg = colorToString(hl.foreground, this.fg_color);
                 } else {
-                    this.fontAttributes.fg = colorString(hl.foreground, this.fg_color);
-                    this.fontAttributes.bg = colorString(hl.background, this.bg_color);
+                    this.fontAttributes.fg = colorToString(hl.foreground, this.fg_color);
+                    this.fontAttributes.bg = colorToString(hl.background, this.bg_color);
                 }
-                this.fontAttributes.sp = colorString(hl.special, this.sp_color || this.fg_color);
+                this.fontAttributes.sp = colorToString(hl.special, this.sp_color || this.fg_color);
                 console.log('Highlight is updated: ', this.fontAttributes);
                 break;
             }
@@ -218,19 +205,19 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.UpdateFG: {
-                this.fg_color = colorString(action.color, this.fontAttributes.fg);
+                this.fg_color = colorToString(action.color, this.fontAttributes.fg);
                 this.emit('update-fg');
                 console.log('Foreground color is updated: ', this.fg_color);
                 break;
             }
             case Kind.UpdateBG: {
-                this.bg_color = colorString(action.color, this.fontAttributes.bg);
+                this.bg_color = colorToString(action.color, this.fontAttributes.bg);
                 this.emit('update-bg');
                 console.log('Background color is updated: ', this.bg_color);
                 break;
             }
             case Kind.UpdateSP: {
-                this.sp_color = colorString(action.color, this.fg_color);
+                this.sp_color = colorToString(action.color, this.fg_color);
                 this.emit('update-sp-color');
                 console.log('Special color is updated: ', this.sp_color);
                 break;
@@ -265,13 +252,13 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.UpdateFontPx: {
-                this.fontAttributes.specified_px = action.font_px;
-                this.emit('font-px-specified');
+                this.fontSize = action.fontSize;
+                this.emit('font-size-specified');
                 break;
             }
-            case Kind.UpdateFontFace: {
-                this.fontAttributes.face = action.font_face;
-                this.emit('font-face-specified');
+            case Kind.UpdateFontFamily: {
+                this.fontFamily = action.fontFamily;
+                this.emit('font-family-specified');
                 break;
             }
             case Kind.UpdateScreenSize: {
@@ -429,3 +416,22 @@ module.exports = class NeovimStore extends EventEmitter {
 function copy(object) {
     return JSON.parse(JSON.stringify(object))
 }
+
+// Note: 0x001203 -> '#001203'
+function colorToString(color, fallback) {
+    if (typeof color !== 'number' || color < 0) {
+        return fallback;
+    }
+
+    return (
+        '#' +
+        [16, 8, 0]
+            .map(shift => {
+                const mask = 0xff << shift;
+                const hex = ((color & mask) >> shift).toString(16);
+                return hex.length < 2 ? '0' + hex : hex;
+            })
+            .join('')
+    );
+}
+

@@ -8,7 +8,10 @@ const colornames = require('colornames')
 const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
 const Cairo = gi.require('cairo')
+const Pango = gi.require('Pango')
+const PangoCairo = gi.require('PangoCairo')
 
+const Actions = require('./actions.js')
 const KeyEvent = require('./key-event.js')
 
 const EMPTY_OBJECT = {}
@@ -23,11 +26,21 @@ module.exports = class Window extends EventEmitter {
     this.onStoreFlush = this.onStoreFlush.bind(this)
     this.onKeyPressEvent = this.onKeyPressEvent.bind(this)
     this.onDraw = this.onDraw.bind(this)
+    this.onResize = this.onResize.bind(this)
+
+    this.totalWidth  = 200
+    this.totalHeight = 300
+    this.cellWidth   = 10
+    this.cellHeight  = 15
 
     this.initialize()
   }
 
   initialize() {
+
+    /*
+     * Build UI components first
+     */
 
     // Main program window
     this.window = new Gtk.Window({
@@ -64,8 +77,8 @@ module.exports = class Window extends EventEmitter {
 
 
     /*
-    * Build our layout
-    */
+     * Build our layout
+     */
 
     this.scrollWindow.add(this.textView)
 
@@ -91,8 +104,15 @@ module.exports = class Window extends EventEmitter {
 
 
     /*
-    * Event handlers
-    */
+     * Other objects
+     */
+
+    this.pangoContext = this.drawingArea.createPangoContext()
+
+
+    /*
+     * Event handlers
+     */
 
     // whenever a new page is loaded ...
     this.textView.on('key-press-event', this.onKeyPressEvent)
@@ -123,6 +143,7 @@ module.exports = class Window extends EventEmitter {
 
     // Start listening to events
     this.store.on('flush', this.onStoreFlush)
+    this.store.on('resize', this.onResize)
 
     // Cursor blink
     this.blinkInterval = setInterval(() => this.blink(), 600)
@@ -133,11 +154,126 @@ module.exports = class Window extends EventEmitter {
     this.drawingArea.queueDraw()
   }
 
+  show() {
+    this.window.showAll()
+  }
+
+  quit() {
+    clearInterval(this.blinkInterval)
+    Gtk.mainQuit()
+    process.exit()
+    // FIXME(quit neovim)
+  }
+
+  getPosition(line, col) {
+    return [col * this.cellWidth, line * this.cellHeight]
+  }
+
+  drawText(line, col, tokens, context) {
+    const markups = []
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i]
+      markups.push(`<span ${this.getPangoAttributes(token.attr)}>${token.text}</span>`)
+    }
+    this.pangoLayout.setMarkup(markups.join(''))
+
+    // Draw text
+    const x = col  * this.cellWidth
+    const y = line * this.cellHeight
+
+    context.moveTo(x, y)
+    PangoCairo.updateLayout(context, this.pangoLayout)
+    PangoCairo.showLayout(context, this.pangoLayout)
+  }
+
+  getPangoAttributes(attr) {
+    /* {
+      fg: 'black',
+      bg: 'white',
+      sp: 'white',
+      bold: true,
+      italic: undefined,
+      underline: undefined,
+      undercurl: undefined,
+      draw_width: 1,
+      draw_height: 1,
+      width: 1,
+      height: 1,
+      specified_px: 1,
+      face: 'monospace'
+    } */
+
+    const pangoAttrs = {
+      foreground: colorToHex(attr.fg ? attr.fg : this.store.fg_color),
+      background: colorToHex(attr.bg ? attr.bg : this.store.bg_color),
+    }
+
+    if (attr) {
+      Object.keys(attr).forEach(key => {
+        switch (key) {
+          case 'reverse':
+            const {foreground, background} = pangoAttrs
+            pangoAttrs.foreground = background
+            pangoAttrs.background = foreground
+            break
+          case 'italic':
+            pangoAttrs.font_style = 'italic'
+            break
+          case 'bold':
+            pangoAttrs.font_weight = 'bold'
+            if (this.boldSpacing)
+              pangoAttrs.letter_spacing = String(this.boldSpacing)
+            break
+          case 'underline':
+            pangoAttrs.underline = 'single'
+            break
+        }
+      })
+    }
+
+    return Object.keys(pangoAttrs).map(key => `${key}=${pangoAttrs[key]}`).join(' ')
+  }
+
+  setText(string) {
+    this.textView.getBuffer().setText(string, countUtf8Bytes(string))
+  }
+
   onStoreFlush() {
     this.drawingArea.queueDraw()
 
     const text = this.store.screen.getText(this.store.cursor)
     this.setText(text)
+  }
+
+  onResize(lines, cols) {
+
+    // create FontDescription object for the selected font/size
+    const fontDetails = parseFont(`${this.store.fontFamily} ${this.store.fontSize}`)
+    const {fontDescription, pixels, normalWidth, boldWidth} = fontDetails
+
+    this.fontDescription = fontDescription
+
+    // calculate the letter_spacing required to make bold have the same
+    // width as normal
+    this.boldSpacing = normalWidth - boldWidth
+    const [cellWidth, cellHeight] = pixels
+    // calculate the total pixel width/height of the drawing area
+    this.totalWidth = cellWidth * cols
+    this.totalHeight = cellHeight * lines
+
+    const gdkwin = this.drawingArea.getWindow()
+    const content = Cairo.Content.COLOR
+
+    this.cairoSurface = gdkwin.createSimilarSurface(content,
+                                                    this.totalWidth,
+                                                    this.totalHeight)
+    this.cairoContext = new Cairo.Context(this.cairoSurface)
+    this.pangoLayout = PangoCairo.createLayout(this.cairoContext)
+    this.pangoLayout.setAlignment(Pango.Alignment.LEFT)
+    this.pangoLayout.setFontDescription(this.fontDescription)
+    this.cellWidth = cellWidth
+    this.cellHeight = cellHeight
+    // this.window.resize(this.totalWidth, this.totalHeight)
   }
 
   onDraw(context) {
@@ -146,38 +282,10 @@ module.exports = class Window extends EventEmitter {
     const cursor = this.store.cursor
     const mode = this.store.mode
 
-    const fontFamily = 'Fantasque Sans Mono'
-    const defaultColor = 'white'
+    const defaultColor = this.store.fg_color
     const defaultBackgroundColor = this.store.bg_color // '#2c3133'
 
-    const fontSize = 14
-    const lineHeight = 16
-
-    context.setFontSize(fontSize)
-
-    const extents = context.textExtents('X')
-    const fontExtents = context.fontExtents()
-
-    const characterWidth = extents.xAdvance
-    const totalWidth = characterWidth * screen.cols
-
-    console.log({
-      extents: {
-        xAdvance: extents.xAdvance,
-        yAdvance: extents.yAdvance,
-        width:    extents.width,
-        height:   extents.height,
-        xBearing: extents.xBearing,
-        yBearing: extents.yBearing,
-      },
-      fontExtents: {
-        ascent:      fontExtents.ascent,
-        descent:     fontExtents.descent,
-        height:      fontExtents.height,
-        maxXAdvance: fontExtents.maxXAdvance,
-        maxYAdvance: fontExtents.maxYAdvance,
-      },
-    })
+    const {fontFamily, fontSize, lineHeight} = this.store
 
     /* {
       fg: 'black',
@@ -195,12 +303,16 @@ module.exports = class Window extends EventEmitter {
       face: 'monospace'
     } */
 
+    context.setFontSize(fontSize)
+
+
     const originY = 20
     let currentY = originY
 
     /* Draw background */
     setContextColorFromHex(context, colorToHex(this.store.bg_color))
-    context.rectangle(0, currentY, screen.cols * characterWidth, screen.length * lineHeight)
+    console.log(0, currentY, this.totalWidth, this.totalHeight)
+    context.rectangle(0, currentY, this.totalWidth, this.totalHeight)
     context.fill()
 
     /* Draw tokens */
@@ -208,33 +320,35 @@ module.exports = class Window extends EventEmitter {
       const line = screen[i]
       const tokens = line.tokens
 
-      let currentX = 0
+      this.drawText(line, 0, tokens, context)
 
-      for (let j = 0; j < tokens.length; j++) {
-        const token = tokens[j]
-        const attr = token.attr || EMPTY_OBJECT
-
-        const fg = colorToHex(attr.fg ? attr.fg : defaultColor)
-        const bg = colorToHex(attr.bg ? attr.bg : defaultBackgroundColor)
-
-        const width = token.text.length * characterWidth
-
-        context.selectFontFace(
-          fontFamily,
-          attr.italic ? Cairo.FontSlant.ITALIC : Cairo.FontSlant.NORMAL,
-          attr.bold   ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL
-        )
-
-        setContextColorFromHex(context, bg)
-        context.rectangle(currentX, currentY, width, lineHeight)
-        context.fill()
-
-        setContextColorFromHex(context, fg)
-        context.moveTo(currentX, currentY - extents.yBearing)
-        context.showText(token.text)
-
-        currentX += width
-      }
+/*       let currentX = 0
+ * 
+ *       for (let j = 0; j < tokens.length; j++) {
+ *         const token = tokens[j]
+ *         const attr = token.attr || EMPTY_OBJECT
+ * 
+ *         const fg = colorToHex(attr.fg ? attr.fg : defaultColor)
+ *         const bg = colorToHex(attr.bg ? attr.bg : defaultBackgroundColor)
+ * 
+ *         const width = token.text.length * this.cellWidth
+ * 
+ *         context.selectFontFace(
+ *           fontFamily,
+ *           attr.italic ? Cairo.FontSlant.ITALIC : Cairo.FontSlant.NORMAL,
+ *           attr.bold   ? Cairo.FontWeight.BOLD : Cairo.FontWeight.NORMAL
+ *         )
+ * 
+ *         setContextColorFromHex(context, bg)
+ *         context.rectangle(currentX, currentY, width, lineHeight)
+ *         context.fill()
+ * 
+ *         setContextColorFromHex(context, fg)
+ *         context.moveTo(currentX, currentY - this.cellHeight)
+ *         context.showText(token.text)
+ * 
+ *         currentX += width
+ *       } */
 
       currentY += lineHeight
     }
@@ -245,8 +359,8 @@ module.exports = class Window extends EventEmitter {
 
       if (mode === 'insert' || mode === 'cmdline_normal') {
         context.setLineWidth(2)
-        context.moveTo(cursor.col * characterWidth, originY + cursor.line * lineHeight)
-        context.lineTo(cursor.col * characterWidth, originY + (cursor.line + 1) * lineHeight)
+        context.moveTo(cursor.col * this.cellWidth, originY + cursor.line * lineHeight)
+        context.lineTo(cursor.col * this.cellWidth, originY + (cursor.line + 1) * lineHeight)
         context.stroke()
       }
       else {
@@ -264,11 +378,22 @@ module.exports = class Window extends EventEmitter {
         )
 
         setContextColorFromHex(context, fg)
-        context.rectangle(cursor.col * characterWidth, originY + cursor.line * lineHeight, characterWidth, lineHeight)
+        console.log(
+          cursor.col * this.cellWidth,
+          originY + cursor.line * lineHeight,
+          this.cellWidth,
+          lineHeight
+        )
+        context.rectangle(
+          cursor.col * this.cellWidth,
+          originY + cursor.line * lineHeight,
+          this.cellWidth,
+          lineHeight
+        )
         context.fill()
 
         setContextColorFromHex(context, bg)
-        context.moveTo(cursor.col * characterWidth, originY + (cursor.line + 1) * lineHeight)
+        context.moveTo(cursor.col * this.cellWidth, originY + (cursor.line + 1) * lineHeight)
         context.showText(token.text)
       }
     }
@@ -284,7 +409,7 @@ module.exports = class Window extends EventEmitter {
     for (let i = 0; i < screen.length; i++) {
 
       context.moveTo(0, currentY)
-      context.lineTo(totalWidth, currentY)
+      context.lineTo(this.totalWidth, currentY)
       context.stroke()
 
       let currentX = 0
@@ -294,7 +419,7 @@ module.exports = class Window extends EventEmitter {
         context.lineTo(currentX, currentY + lineHeight)
         context.stroke()
 
-        currentX += characterWidth
+        currentX += this.cellWidth
       }
 
       currentY += lineHeight
@@ -310,21 +435,6 @@ module.exports = class Window extends EventEmitter {
     this.emit('key-press', KeyEvent.fromGdk(event), event)
 
     return true
-  }
-
-  show() {
-    this.window.showAll()
-  }
-
-  quit() {
-    clearInterval(this.blinkInterval)
-    Gtk.mainQuit()
-    process.exit()
-    // FIXME(quit neovim)
-  }
-
-  setText(string) {
-    this.textView.getBuffer().setText(string, countUtf8Bytes(string))
   }
 }
 
@@ -366,4 +476,18 @@ function setContextColorFromHex(context, hex) {
   const g = parseInt(hex.slice(3, 5), 16) / 255
   const b = parseInt(hex.slice(5, 7), 16) / 255
   context.setSourceRgb(r, g, b)
+}
+
+function parseFont(font) {
+  const cr = new Cairo.Context(new Cairo.ImageSurface(Cairo.Format.RGB24, 300, 300))
+  const fontDescription = Pango.fontDescriptionFromString(font)
+  const layout = PangoCairo.createLayout(cr)
+  layout.setFontDescription(fontDescription)
+  layout.setAlignment(Pango.Alignment.LEFT)
+  layout.setMarkup('<span font_weight="bold">A</span>')
+  const [boldWidth] = layout.getSize()
+  layout.setMarkup('<span>A</span>')
+  const pixels = layout.getPixelSize()
+  const [normalWidth] = layout.getSize()
+  return { fontDescription, pixels, normalWidth, boldWidth }
 }

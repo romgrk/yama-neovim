@@ -67,8 +67,8 @@ const Kind = exports.Kind = {
     UpdateBG: 'UpdateBG',
     UpdateFG: 'UpdateFG',
     UpdateSP: 'UpdateSP',
-    UpdateFontFace: 'UpdateFontFace',
-    UpdateFontPx: 'UpdateFontPx',
+    UpdateFontFamily: 'UpdateFontFamily',
+    UpdateFontSize: 'UpdateFontSize',
     UpdateFontSize: 'UpdateFontSize',
     UpdateLineHeight: 'UpdateLineHeight',
     UpdateScreenBounds: 'UpdateScreenBounds',
@@ -89,8 +89,8 @@ const Kind = exports.Kind = {
  *     draw_height?: number;
  *     event?: MouseEvent | WheelEvent;
  *     focused?: boolean;
- *     font_face?: string;
- *     font_px?: number;
+ *     fontFamily?: string;
+ *     fontSize?: number;
  *     height?: number;
  *     highlight?: HighlightSet;
  *     icon_path?: string;
@@ -225,17 +225,17 @@ exports.inputToNeovim = function inputToNeovim(input) {
     };
 }
 
-exports.updateFontPx = function updateFontPx(font_px) {
+exports.updateFontSize = function updateFontSize(fontSize) {
     return {
-        type: Kind.UpdateFontPx,
-        font_px,
+        type: Kind.UpdateFontSize,
+        fontSize,
     };
 }
 
-exports.updateFontFace = function updateFontFace(font_face) {
+exports.updateFontFamily = function updateFontFamily(fontFamily) {
     return {
-        type: Kind.UpdateFontFace,
-        font_face,
+        type: Kind.UpdateFontFamily,
+        fontFamily,
     };
 }
 
