@@ -34,7 +34,12 @@ window.on('key-press', (event, original) => {
 
 app.start(
   'nvim',
-  ['--embed', '--headless', '-u', 'NORC'],
+  [
+    '--embed',
+    '--headless',
+    '--cmd', 'set termguicolors',
+    '-u', 'NORC'
+  ],
   20,
   50
 )
