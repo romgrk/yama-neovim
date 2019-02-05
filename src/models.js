@@ -245,7 +245,8 @@ class Screen extends Array {
 
     put(cursor, token) {
         const line = this.lines[cursor.line]
-        const tokens = JSON.parse(JSON.stringify(line.tokens))
+        if (cursor.line >= this.size.line || cursor.col >= this.size.col)
+            throw new Error(`Out of bounds cursor position: line ${cursor.line}, col ${cursor.col}`)
         line.insert(cursor.col, token)
     }
 

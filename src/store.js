@@ -44,9 +44,9 @@ module.exports = class NeovimStore extends EventEmitter {
      *
      * size: Size;
      * fontAttributes: FontAttributes;
-     * fg_color: string;
-     * bg_color: string;
-     * sp_color: string;
+     * foregroundColor: string;
+     * backgroundColor: string;
+     * specialColor: string;
      * cursor: Cursor;
      * modeInfo: ModeInfoSet;
      * mode: string;
@@ -72,6 +72,10 @@ module.exports = class NeovimStore extends EventEmitter {
             width: 0,
             height: 0,
         }
+        this.cursor = {
+            line: 0,
+            col: 0,
+        }
         this.fontFamily = 'Fira Code Retina'
         this.fontSize = 12
         this.lineHeight = 16
@@ -85,13 +89,10 @@ module.exports = class NeovimStore extends EventEmitter {
             undercurl: false,
             reverse: false,
         }
-        this.fg_color = 'white'
-        this.bg_color = 'black'
-        this.sp_color = 'blue'
-        this.cursor = {
-            line: 0,
-            col: 0,
-        }
+        this.foregroundColor = 'white'
+        this.backgroundColor = 'black'
+        this.specialColor = 'blue'
+        this.cursorColor = '#888888'
         this.modeInfo = {}
         this.mode = 'normal'
         this.busy = false
@@ -140,9 +141,9 @@ module.exports = class NeovimStore extends EventEmitter {
             }
             case Kind.Highlight: {
                 const hl = action.highlight;
-                this.fontAttributes.fg = colorToString(hl.foreground, this.fg_color);
-                this.fontAttributes.bg = colorToString(hl.background, this.bg_color);
-                this.fontAttributes.sp = colorToString(hl.special, this.sp_color || this.fg_color);
+                this.fontAttributes.fg = colorToString(hl.foreground, this.foregroundColor);
+                this.fontAttributes.bg = colorToString(hl.background, this.backgroundColor);
+                this.fontAttributes.sp = colorToString(hl.special, this.specialColor || this.foregroundColor);
                 this.fontAttributes.bold = hl.bold;
                 this.fontAttributes.italic = hl.italic;
                 this.fontAttributes.underline = hl.underline;
@@ -189,21 +190,21 @@ module.exports = class NeovimStore extends EventEmitter {
                 break;
             }
             case Kind.UpdateFG: {
-                this.fg_color = colorToString(action.color, this.fontAttributes.fg);
+                this.foregroundColor = colorToString(action.color, this.fontAttributes.fg);
                 this.emit('update-fg');
-                console.log('Foreground color is updated: ', this.fg_color);
+                console.log('Foreground color is updated: ', this.foregroundColor);
                 break;
             }
             case Kind.UpdateBG: {
-                this.bg_color = colorToString(action.color, this.fontAttributes.bg);
+                this.backgroundColor = colorToString(action.color, this.fontAttributes.bg);
                 this.emit('update-bg');
-                console.log('Background color is updated: ', this.bg_color);
+                console.log('Background color is updated: ', this.backgroundColor);
                 break;
             }
             case Kind.UpdateSP: {
-                this.sp_color = colorToString(action.color, this.fg_color);
+                this.specialColor = colorToString(action.color, this.foregroundColor);
                 this.emit('update-sp-color');
-                console.log('Special color is updated: ', this.sp_color);
+                console.log('Special color is updated: ', this.specialColor);
                 break;
             }
             case Kind.ModeInfo: {

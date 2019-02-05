@@ -18,6 +18,43 @@ const KeyEvent = require('./key-event.js')
 
 const EMPTY_OBJECT = {}
 
+class Finder {
+  constructor() {
+    this.element = new Gtk.Box({
+      orientation: Gtk.Orientation.VERTICAL,
+      halign: Gtk.Align.CENTER,
+      valign: Gtk.Align.CENTER,
+    })
+    this.input = new Gtk.Entry()
+    this.listBox = new Gtk.ListBox()
+    this.scrollWindow = new Gtk.ScrolledWindow()
+
+    this.scrollWindow.add(this.listBox)
+
+    this.element.add(this.input)
+    this.element.add(this.scrollWindow)
+
+    this.setChildren([
+      new Gtk.Label({ label: 'Item 1' }),
+      new Gtk.Label({ label: 'Item 2' }),
+      new Gtk.Label({ label: 'Item 3' }),
+    ])
+  }
+
+  setChildren(children) {
+    const currentChildren = this.listBox.getChildren()
+    currentChildren.forEach(child => {
+      this.listBox.remove(child)
+    })
+
+    children.forEach(child => {
+      const row = new Gtk.ListBoxRow()
+      row.add(child)
+      this.listBox.add(row)
+    })
+  }
+}
+
 module.exports = class Window extends EventEmitter {
   constructor(store, application) {
     super()
@@ -53,6 +90,9 @@ module.exports = class Window extends EventEmitter {
       type : Gtk.WindowType.TOPLEVEL
     })
 
+    // Overlay container
+    this.overlay = new Gtk.Overlay()
+
     // Draw area
     this.drawingArea = new Gtk.DrawingArea()
     this.drawingArea.canFocus = true
@@ -76,7 +116,8 @@ module.exports = class Window extends EventEmitter {
 
     // horizontal and vertical boxes
     this.hbox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL })
-    this.vbox = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL })
+
+    this.finder = new Finder()
 
 
     /*
@@ -99,10 +140,14 @@ module.exports = class Window extends EventEmitter {
     // this.hbox.packStart(this.scrollWindow, true, true, 0)
     this.hbox.packStart(this.drawingArea,  true, true, 0)
 
+    const mainContainer = this.hbox
+
+    this.overlay.add(mainContainer)
+
     // configure main window
     this.window.setDefaultSize(800, 720)
     this.window.setResizable(true)
-    this.window.add(this.hbox)
+    this.window.add(this.overlay)
 
     /*
      * Event handlers
@@ -191,8 +236,8 @@ module.exports = class Window extends EventEmitter {
     } */
 
     const pangoAttrs = {
-      foreground: colorToHex(attr.fg ? attr.fg : this.store.fg_color),
-      background: colorToHex(attr.bg ? attr.bg : this.store.bg_color),
+      foreground: colorToHex(attr.fg ? attr.fg : this.store.foregroundColor),
+      background: colorToHex(attr.bg ? attr.bg : this.store.backgroundColor),
     }
 
     if (attr) {
@@ -249,10 +294,10 @@ module.exports = class Window extends EventEmitter {
   }
 
   drawCursor(context) {
-    context.setSourceRgba(0.8, 0.8, 0.8, 1)
-
     const focused = this.store.focused
     const mode = this.store.mode
+
+    setContextColorFromHex(context, this.store.cursorColor)
 
     if (!focused) {
       this.drawCursorBlockOutline(context, false)
@@ -316,8 +361,8 @@ module.exports = class Window extends EventEmitter {
     const text = token.text || ' '
     const attr = token.attr || EMPTY_OBJECT
 
-    const fg = colorToHex(attr.fg ? attr.fg : this.store.fg_color)
-    const bg = colorToHex(attr.bg ? attr.bg : this.store.bg_color)
+    const fg = colorToHex(attr.fg ? attr.fg : this.store.foregroundColor)
+    const bg = colorToHex(attr.bg ? attr.bg : this.store.backgroundColor)
 
     const cursorToken = { text, attr: { ...attr, fg: bg, bg: fg } }
 
@@ -352,7 +397,7 @@ module.exports = class Window extends EventEmitter {
     context.setFontSize(fontSize)
 
     /* Draw background */
-    setContextColorFromHex(context, colorToHex(this.store.bg_color))
+    setContextColorFromHex(context, colorToHex(this.store.backgroundColor))
     context.rectangle(0, 0, allocatedWidth, allocatedHeight)
     context.fill()
 
