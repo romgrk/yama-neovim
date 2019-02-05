@@ -40,7 +40,7 @@ const { Screen, Line } = require('./models.js')
 
 
 module.exports = class NeovimStore extends EventEmitter {
-    /* dispatch_token: string;
+    /* dispatchToken: string;
      *
      * size: Size;
      * fontAttributes: FontAttributes;
@@ -59,12 +59,9 @@ module.exports = class NeovimStore extends EventEmitter {
      * scrollRegion: Region;
      * dispatcher: Dispatcher<ActionType>;
      * focused: boolean;
-     * line_height: number;
-     * alt_key_disabled: boolean;
-     * meta_key_disabled: boolean;
-     * cursor_draw_delay: number;
+     * lineHeight: number;
      * blink_cursor: boolean;
-     * cursor_blink_interval: number; */
+     */
 
     constructor() {
         super()
@@ -76,8 +73,8 @@ module.exports = class NeovimStore extends EventEmitter {
             height: 0,
         }
         this.fontFamily = 'Fira Code Retina'
-        this.fontSize = 16
-        this.lineHeight = 18
+        this.fontSize = 12
+        this.lineHeight = 16
         this.fontAttributes = {
             fg: 'white',
             bg: 'black',
@@ -110,14 +107,14 @@ module.exports = class NeovimStore extends EventEmitter {
             bottom: 0,
         }
         this.focused = true
-        this.line_height = 1.2
-        this.alt_key_disabled = false
-        this.meta_key_disabled = false
-        this.cursor_draw_delay = 10
         this.blink_cursor = false
         this.cursor_blink_interval = 1000
-        this.dispatch_token = this.dispatcher.register(this.receiveAction.bind(this))
+        this.dispatchToken = this.dispatcher.register(this.receiveAction.bind(this))
         this.screen = new Screen(0, 0)
+    }
+
+    dispatch(action) {
+        this.dispatcher.dispatch(action)
     }
 
     receiveAction(action) {
@@ -143,13 +140,15 @@ module.exports = class NeovimStore extends EventEmitter {
             }
             case Kind.Highlight: {
                 const hl = action.highlight;
+                this.fontAttributes.fg = colorToString(hl.foreground, this.fg_color);
+                this.fontAttributes.bg = colorToString(hl.background, this.bg_color);
+                this.fontAttributes.sp = colorToString(hl.special, this.sp_color || this.fg_color);
                 this.fontAttributes.bold = hl.bold;
                 this.fontAttributes.italic = hl.italic;
                 this.fontAttributes.underline = hl.underline;
                 this.fontAttributes.undercurl = hl.undercurl;
                 this.fontAttributes.reverse = hl.reverse;
-                this.fontAttributes.sp = colorToString(hl.special, this.sp_color || this.fg_color);
-                console.log('Highlight is updated: ', this.fontAttributes);
+                // console.log('Highlight is updated: ', this.fontAttributes);
                 break;
             }
             case Kind.FocusChanged: {
@@ -338,29 +337,11 @@ module.exports = class NeovimStore extends EventEmitter {
             }
 
             case Kind.UpdateLineHeight: {
-                if (this.line_height !== action.line_height) {
-                    this.line_height = action.line_height;
+                if (this.lineHeight !== action.lineHeight) {
+                    this.lineHeight = action.lineHeight;
                     this.emit('line-height-changed');
-                    console.log('Line height is changed to ', this.line_height);
+                    console.log('Line height is changed to ', this.lineHeight);
                 }
-                break;
-            }
-            case Kind.DisableAltKey: {
-                this.alt_key_disabled = action.disabled;
-                this.emit('alt-key-disabled');
-                console.log('Alt key disabled: ', action.disabled);
-                break;
-            }
-            case Kind.DisableMetaKey: {
-                this.meta_key_disabled = action.disabled;
-                this.emit('meta-key-disabled');
-                console.log('Meta key disabled: ', action.disabled);
-                break;
-            }
-            case Kind.ChangeCursorDrawDelay: {
-                this.cursor_draw_delay = action.delay;
-                this.emit('cursor-draw-delay-changed');
-                console.log(`Drawing cursor is delayed by ${action.delay}ms`);
                 break;
             }
             case Kind.CompositionStart: {

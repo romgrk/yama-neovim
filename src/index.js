@@ -2,6 +2,9 @@
  * index.js
  */
 
+const util = require('util')
+util.inspect.defaultOptions = { breakLength: 180 }
+
 const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
 const Gdk = gi.require('Gdk', '3.0')
@@ -21,7 +24,6 @@ const window = new Window(store, app)
 
 
 window.on('key-press', (event, original) => {
-
   const input = KeyEvent.getVimInput(event)
   const shouldFilter = KeyEvent.shouldFilter(event)
 
@@ -31,6 +33,14 @@ window.on('key-press', (event, original) => {
     app.client.input(input)
 })
 
+window.on('quit', () => {
+  app.quit()
+})
+
+app.on('disconnect', () => {
+  window.quit()
+})
+
 
 app.start(
   'nvim',
@@ -38,7 +48,7 @@ app.start(
     '--embed',
     '--headless',
     '--cmd', 'set termguicolors',
-    '-u', 'NORC'
+    // '-u', 'NORC'
   ],
   20,
   50

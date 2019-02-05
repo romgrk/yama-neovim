@@ -5,8 +5,10 @@
 
 const EventEmitter = require('events')
 const colornames = require('colornames')
+const debounce = require('debounce')
 const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
+const Gdk = gi.require('Gdk', '3.0')
 const Cairo = gi.require('cairo')
 const Pango = gi.require('Pango')
 const PangoCairo = gi.require('PangoCairo')
@@ -23,6 +25,8 @@ module.exports = class Window extends EventEmitter {
     this.application = application
     this.store = store
 
+    this.resetBlink = this.resetBlink.bind(this)
+    this.blink = this.blink.bind(this)
     this.onStoreFlush = this.onStoreFlush.bind(this)
     this.onKeyPressEvent = this.onKeyPressEvent.bind(this)
     this.onDraw = this.onDraw.bind(this)
@@ -33,7 +37,7 @@ module.exports = class Window extends EventEmitter {
     this.cellWidth   = 10
     this.cellHeight  = 15
 
-    this.cursorThickness = 3
+    this.cursorThickness = 2
 
     this.initialize()
   }
@@ -49,13 +53,10 @@ module.exports = class Window extends EventEmitter {
       type : Gtk.WindowType.TOPLEVEL
     })
 
-    // TextView
-    this.textView = new Gtk.TextView()
-    this.textView.setMonospace(true)
-
     // Draw area
     this.drawingArea = new Gtk.DrawingArea()
-    this.drawingArea.on('draw', this.onDraw)
+    this.drawingArea.canFocus = true
+    this.drawingArea.addEvents(Gdk.EventMask.ALL_EVENTS_MASK)
 
     // Toolbar with buttons
     this.toolbar = new Gtk.Toolbar()
@@ -82,10 +83,9 @@ module.exports = class Window extends EventEmitter {
      * Build our layout
      */
 
-    this.scrollWindow.add(this.textView)
+    // this.scrollWindow.add(this.textView)
 
     /* this.toolbar.add(this.button.back)
-     * this.toolbar.add(this.button.forward)
      * this.toolbar.add(this.button.refresh) */
 
     // Gtk.Box.prototype
@@ -96,59 +96,67 @@ module.exports = class Window extends EventEmitter {
     // this.hbox.packStart(this.urlBar,  true,  true,  8)
 
     // pack vertically top bar (this.hbox) and scrollable window
-    this.hbox.packStart(this.scrollWindow, true, true, 0)
+    // this.hbox.packStart(this.scrollWindow, true, true, 0)
     this.hbox.packStart(this.drawingArea,  true, true, 0)
 
     // configure main window
-    this.window.setDefaultSize(1200, 720)
+    this.window.setDefaultSize(800, 720)
     this.window.setResizable(true)
     this.window.add(this.hbox)
-
-
-    /*
-     * Other objects
-     */
-
-    this.pangoContext = this.drawingArea.createPangoContext()
-
 
     /*
      * Event handlers
      */
 
+    this.attachEventHandlers()
+  }
+
+  attachEventHandlers() {
+
     // whenever a new page is loaded ...
-    this.textView.on('key-press-event', this.onKeyPressEvent)
+    this.drawingArea.on('draw', this.onDraw)
+    this.drawingArea.on('key-press-event', this.onKeyPressEvent)
 
     // define "enter" / call-to-action event (whenever the url changes on the bar)
     /* this.urlBar.on('activate', () => {
      *   let href = url(this.urlBar.getText())
      *   this.urlBar.setText(href)
-     *   this.textView.loadUri(href)
      * }) */
 
-    // window show event
-    this.window.on('show', () => {
-      // bring it on top in OSX
-      // window.setKeepAbove(true)
-
-      // This start the Gtk event loop. It is required to process user events.
-      // It doesn't return until you don't need Gtk anymore, usually on window close.
-      Gtk.main()
+    this.application.on('start', () => {
+      this.tryResize()
     })
 
-    // window after-close event
+    this.window.on('show', () => Gtk.main())
     this.window.on('destroy', () => this.quit())
-
-    // window close event: returning true has the semantic of preventing the default behavior:
-    // in this case, it would prevent the user from closing the window if we would return `true`
     this.window.on('delete-event', () => false)
+    this.window.on('configure-event', debounce(() => this.tryResize(), 200))
 
     // Start listening to events
     this.store.on('flush', this.onStoreFlush)
     this.store.on('resize', this.onResize)
+    this.store.on('cursor', this.resetBlink)
 
     // Cursor blink
-    this.blinkInterval = setInterval(() => this.blink(), 600)
+    this.resetBlink()
+  }
+
+  tryResize() {
+    const font = `${this.store.fontFamily} ${this.store.fontSize}px`
+    const {cellWidth, cellHeight} = parseFont(Pango.fontDescriptionFromString(font))
+    const width  = this.drawingArea.getAllocatedWidth()
+    const height = this.drawingArea.getAllocatedHeight()
+    const lines = Math.floor(height / cellHeight)
+    const cols  = Math.floor(width / cellWidth)
+
+    this.application.client.uiTryResize(cols, lines)
+  }
+
+  resetBlink() {
+    if (this.blinkInterval)
+      clearInterval(this.blinkInterval)
+    this.blinkInterval = setInterval(this.blink, 600)
+    this.blinkValue = true
   }
 
   blink() {
@@ -163,12 +171,54 @@ module.exports = class Window extends EventEmitter {
   quit() {
     clearInterval(this.blinkInterval)
     Gtk.mainQuit()
-    process.exit()
-    // FIXME(quit neovim)
+    this.emit('quit')
   }
 
   getPosition(line, col) {
     return [col * this.cellWidth, line * this.cellHeight]
+  }
+
+  getPangoAttributes(attr) {
+    /* {
+      fg: 'black',
+      bg: 'white',
+      sp: 'white',
+      bold: true,
+      italic: undefined,
+      underline: undefined,
+      undercurl: undefined,
+      reverse: undefined,
+    } */
+
+    const pangoAttrs = {
+      foreground: colorToHex(attr.fg ? attr.fg : this.store.fg_color),
+      background: colorToHex(attr.bg ? attr.bg : this.store.bg_color),
+    }
+
+    if (attr) {
+      Object.keys(attr).forEach(key => {
+        switch (key) {
+          case 'reverse':
+            const {foreground, background} = pangoAttrs
+            pangoAttrs.foreground = background
+            pangoAttrs.background = foreground
+            break
+          case 'italic':
+            pangoAttrs.font_style = 'italic'
+            break
+          case 'bold':
+            pangoAttrs.font_weight = 'bold'
+            if (this.boldSpacing)
+              pangoAttrs.letter_spacing = String(this.boldSpacing)
+            break
+          case 'underline':
+            pangoAttrs.underline = 'single'
+            break
+        }
+      })
+    }
+
+    return Object.keys(pangoAttrs).map(key => `${key}="${pangoAttrs[key]}"`).join(' ')
   }
 
   drawText(line, col, tokens, context) {
@@ -176,7 +226,14 @@ module.exports = class Window extends EventEmitter {
 
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i]
-      const text = token.text.replace(/<|>/g, m => m === '<' ? '&lt;' : '&gt;')
+      const text = token.text.replace(/<|>|&/g, m => {
+        switch (m) {
+          case '<': return '&lt;'
+          case '>': return '&gt;'
+          case '&': return '&amp;'
+        }
+        return m
+      })
       markups.push(`<span ${this.getPangoAttributes(token.attr || {})}>${text}</span>`)
     }
 
@@ -194,9 +251,13 @@ module.exports = class Window extends EventEmitter {
   drawCursor(context) {
     context.setSourceRgba(0.8, 0.8, 0.8, 1)
 
+    const focused = this.store.focused
     const mode = this.store.mode
 
-    if (mode === 'insert' || mode === 'cmdline_normal') {
+    if (!focused) {
+      this.drawCursorBlockOutline(context, false)
+    }
+    else if (mode === 'insert' || mode === 'cmdline_normal') {
       this.drawCursorI(context, true)
     }
     else if (mode === 'normal') {
@@ -263,72 +324,92 @@ module.exports = class Window extends EventEmitter {
     this.drawText(cursor.line, cursor.col, [cursorToken], context)
   }
 
-  getPangoAttributes(attr) {
-    /* {
-      fg: 'black',
-      bg: 'white',
-      sp: 'white',
-      bold: true,
-      italic: undefined,
-      underline: undefined,
-      undercurl: undefined,
-      reverse: undefined,
-    } */
+  drawCursorBlockOutline(context, blink) {
+    if (blink && !this.blinkValue)
+      return
 
-    const pangoAttrs = {
-      foreground: colorToHex(attr.fg ? attr.fg : this.store.fg_color),
-      background: colorToHex(attr.bg ? attr.bg : this.store.bg_color),
-    }
+    const cursor = this.store.cursor
 
-    if (attr) {
-      Object.keys(attr).forEach(key => {
-        switch (key) {
-          case 'reverse':
-            const {foreground, background} = pangoAttrs
-            pangoAttrs.foreground = background
-            pangoAttrs.background = foreground
-            break
-          case 'italic':
-            pangoAttrs.font_style = 'italic'
-            break
-          case 'bold':
-            pangoAttrs.font_weight = 'bold'
-            if (this.boldSpacing)
-              pangoAttrs.letter_spacing = String(this.boldSpacing)
-            break
-          case 'underline':
-            pangoAttrs.underline = 'single'
-            break
-        }
-      })
-    }
-
-    return Object.keys(pangoAttrs).map(key => `${key}="${pangoAttrs[key]}"`).join(' ')
+    context.rectangle(
+      cursor.col * this.cellWidth,
+      cursor.line * this.cellHeight,
+      this.cellWidth,
+      this.cellHeight
+    )
+    context.stoke()
   }
 
-  setText(string) {
-    this.textView.getBuffer().setText(string, countUtf8Bytes(string))
+  onDraw(context) {
+
+    const screen = this.store.screen
+    const mode = this.store.mode
+
+    const {fontFamily, fontSize, lineHeight} = this.store
+
+    const allocatedWidth  = this.drawingArea.getAllocatedWidth()
+    const allocatedHeight = this.drawingArea.getAllocatedHeight()
+
+    context.setFontSize(fontSize)
+
+    /* Draw background */
+    setContextColorFromHex(context, colorToHex(this.store.bg_color))
+    context.rectangle(0, 0, allocatedWidth, allocatedHeight)
+    context.fill()
+
+    /* Draw tokens */
+    for (let i = 0; i < screen.lines.length; i++) {
+      const line = screen.lines[i]
+      const tokens = line.tokens
+      this.drawText(i, 0, tokens, context)
+    }
+
+    /* Draw cursor */
+    if (screen.size.lines > 0)
+      this.drawCursor(context)
+
+    /* Draw grid */
+    if (false) {
+      let currentY = 0
+
+      context.setSourceRgba(1.0, 0, 0, 0.8)
+      context.setLineWidth(1)
+
+      for (let i = 0; i < screen.lines.length; i++) {
+
+        context.moveTo(0, currentY)
+        context.lineTo(this.totalWidth, currentY)
+        context.stroke()
+
+        let currentX = 0
+
+        for (let j = 0; j < screen.size.cols; j++) {
+          context.moveTo(currentX, currentY)
+          context.lineTo(currentX, currentY + this.cellHeight)
+          context.stroke()
+
+          currentX += this.cellWidth
+        }
+
+        currentY += this.cellHeight
+      }
+    }
+
+    return true
   }
 
   onStoreFlush() {
     this.drawingArea.queueDraw()
-
-    const text = this.store.screen.getText(this.store.cursor)
-    this.setText(text)
   }
 
   onResize(lines, cols) {
 
     // create FontDescription object for the selected font/size
-    const fontDetails = parseFont(`${this.store.fontFamily} ${this.store.fontSize}`)
-    const {fontDescription, pixels, normalWidth, boldWidth} = fontDetails
+    const font = `${this.store.fontFamily} ${this.store.fontSize}px`
+    this.fontDescription = Pango.fontDescriptionFromString(font)
+    const {cellWidth, cellHeight, normalWidth, boldWidth} = parseFont(this.fontDescription)
 
-    this.fontDescription = fontDescription
-
-    // calculate the letter_spacing required to make bold have the same
-    // width as normal
+    // calculate the letter_spacing required to make bold have the same width as normal
     this.boldSpacing = normalWidth - boldWidth
-    const [cellWidth, cellHeight] = pixels
     // calculate the total pixel width/height of the drawing area
     this.totalWidth  = cellWidth * cols
     this.totalHeight = cellHeight * lines
@@ -343,60 +424,6 @@ module.exports = class Window extends EventEmitter {
     this.cellWidth = cellWidth
     this.cellHeight = cellHeight
     // this.window.resize(this.totalWidth, this.totalHeight)
-  }
-
-  onDraw(context) {
-
-    const screen = this.store.screen
-    const mode = this.store.mode
-
-    const {fontFamily, fontSize, lineHeight} = this.store
-
-    context.setFontSize(fontSize)
-
-    /* Draw background */
-    setContextColorFromHex(context, colorToHex(this.store.bg_color))
-    context.rectangle(0, 0, this.totalWidth, this.totalHeight)
-    context.fill()
-
-    /* Draw tokens */
-    for (let i = 0; i < screen.length; i++) {
-      const line = screen[i]
-      const tokens = line.tokens
-      this.drawText(i, 0, tokens, context)
-    }
-
-    /* Draw cursor */
-    this.drawCursor(context)
-
-    /* Draw grid */
-    if (false) {
-      let currentY = 0
-
-      context.setSourceRgba(1.0, 0, 0, 0.8)
-      context.setLineWidth(1)
-
-      for (let i = 0; i < screen.length; i++) {
-
-        context.moveTo(0, currentY)
-        context.lineTo(this.totalWidth, currentY)
-        context.stroke()
-
-        let currentX = 0
-
-        for (let j = 0; j < screen.cols; j++) {
-          context.moveTo(currentX, currentY)
-          context.lineTo(currentX, currentY + this.cellHeight)
-          context.stroke()
-
-          currentX += this.cellWidth
-        }
-
-        currentY += this.cellHeight
-      }
-    }
-
-    return true
   }
 
   onKeyPressEvent(event) {
@@ -449,16 +476,15 @@ function setContextColorFromHex(context, hex) {
   context.setSourceRgb(r, g, b)
 }
 
-function parseFont(font) {
+function parseFont(fontDescription) {
   const cr = new Cairo.Context(new Cairo.ImageSurface(Cairo.Format.RGB24, 300, 300))
-  const fontDescription = Pango.fontDescriptionFromString(font)
   const layout = PangoCairo.createLayout(cr)
   layout.setFontDescription(fontDescription)
   layout.setAlignment(Pango.Alignment.LEFT)
   layout.setMarkup('<span font_weight="bold">A</span>')
   const [boldWidth] = layout.getSize()
   layout.setMarkup('<span>A</span>')
-  const pixels = layout.getPixelSize()
+  const [cellWidth, cellHeight] = layout.getPixelSize()
   const [normalWidth] = layout.getSize()
-  return { fontDescription, pixels, normalWidth, boldWidth }
+  return { cellWidth, cellHeight, normalWidth, boldWidth }
 }

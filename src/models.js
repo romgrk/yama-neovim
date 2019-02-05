@@ -214,49 +214,42 @@ class Line {
 class Screen extends Array {
     constructor(lines, cols) {
         super()
-        this.lines = lines
-        this.cols = cols
+        this.lines = []
+        this.size = { lines, cols }
 
         for (let i = 0; i < lines; i++) {
-            this.push(new Line(cols))
+            this.lines.push(new Line(cols))
         }
     }
 
     resize(lines, cols) {
-        if (lines < this.lines) {
-            const index = this.lines - lines
-            this.splice(index, this.length - index)
+        if (lines < this.size.lines) {
+            const index = this.size.lines - lines
+            this.lines.splice(index, this.lines.length - index)
         }
-        else if (lines > this.lines) {
-            const diff = lines - this.lines
+        else if (lines > this.size.lines) {
+            const diff = lines - this.size.lines
             for (let i = 0; i < diff; i++) {
-                this.push(new Line(this.cols))
+                this.lines.push(new Line(this.size.cols))
             }
         }
 
-        if (cols !== this.cols) {
-            this.forEach(line => {
+        if (cols !== this.size.cols) {
+            this.lines.forEach(line => {
                 line.setLength(cols)
             })
         }
 
-        this.lines = lines
-        this.cols = cols
+        this.size = { lines, cols }
     }
 
     put(cursor, token) {
-        const line = this[cursor.line]
+        const line = this.lines[cursor.line]
         const tokens = JSON.parse(JSON.stringify(line.tokens))
         line.insert(cursor.col, token)
-        if (line.getText().length > this.cols) {
-            console.log('Screen.put', { cursor, token })
-            console.log('Line', tokens)
-            throw new Error('Invalid length')
-        }
     }
 
     scroll(region, count) {
-        console.log('scrolling')
         const top    = region.top
         const bottom = region.bottom + 1
         const left   = region.left
@@ -272,8 +265,8 @@ class Screen extends Array {
                 if (line < top)
                     continue
                 const sourceIndex = top + i
-                const currentLine = this[line]
-                const sourceLine = this[sourceIndex]
+                const currentLine = this.lines[line]
+                const sourceLine = this.lines[sourceIndex]
                 const tokens = sourceLine ? sourceLine.slice(left, right) : [{ text: ' '.repeat(horizontalLength) }]
                 currentLine.insertTokens(left, tokens)
             }
@@ -286,40 +279,38 @@ class Screen extends Array {
                 const destinationIndex = line - count
                 if (destinationIndex >= bottom || destinationIndex <= top)
                     continue
-                const sourceLine = this[line]
-                const destinationLine = this[destinationIndex]
+                const sourceLine = this.lines[line]
+                const destinationLine = this.lines[destinationIndex]
                 const tokens = sourceLine ? sourceLine.slice(left, right) : [{ text: ' '.repeat(horizontalLength) }]
-                console.log({ i, line, sourceTop, sourceBottom })
                 destinationLine.insertTokens(left, tokens)
             }
         }
-        console.log('scrolled')
     }
 
     clearLine(line, col = 0) {
-        this[line].clear(col)
+        this.lines[line].clear(col)
     }
 
     clearAll() {
-        for (let i = 0; i < this.length; i++) {
-            this[i].clear()
+        for (let i = 0; i < this.lines.length; i++) {
+            this.lines[i].clear()
         }
     }
 
     getTokenAt(lnum, col) {
-        const line = this[lnum]
+        const line = this.lines[lnum]
         return line.slice(col, col + 1)[0]
     }
 
     getText(cursor) {
         let text = (
-            '   ╭' + '─'.repeat(this.cols) + '╮\n'
-          + this.map((line, i) =>
+            '   ╭' + '─'.repeat(this.size.cols) + '╮\n'
+          + this.lines.map((line, i) =>
                 String(i).padEnd(2, ' ') + ' │' + line.getText() + '│').join('\n')
-          + '\n   ╰' + '─'.repeat(this.cols) + '╯\n'
+          + '\n   ╰' + '─'.repeat(this.size.cols) + '╯\n'
         )
         if (cursor) {
-            const index = (cursor.line + 1) * (this.cols + 6) + cursor.col + 4
+            const index = (cursor.line + 1) * (this.size.cols + 6) + cursor.col + 4
             text = text.slice(0, index) + '█' + text.slice(index + 1)
         }
         return text

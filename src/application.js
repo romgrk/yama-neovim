@@ -4,14 +4,16 @@
 
 
 const child_process = require('child_process')
+const EventEmitter = require('events')
 const chalk = require('chalk')
 const { attach } = require('promised-neovim-client')
 
 const Action = require('./actions.js')
 
-class Application {
+class Application extends EventEmitter {
 
   constructor(store) {
+    super()
     this.store = store
   }
 
@@ -39,17 +41,18 @@ class Application {
       this.client = nvim
       nvim.on('request', this.onRequested.bind(this))
       nvim.on('notification', this.onNotified.bind(this))
-      nvim.on('disconnect', this.onDisconnected.bind(this)) 
+      nvim.on('disconnect', this.onDisconnect.bind(this)) 
       nvim.uiAttach(columns, lines, true, true /* notify */)
       this.started = true
 
       console.log(`nvim attached: ${this.neovim_process.pid} ${lines}x${columns} ${JSON.stringify(argv)}`)
 
-      // this.store.on('input', (i) => nvim.input(i))
       // this.store.on('update-screen-bounds', () => nvim.uiTryResize(this.store.size.cols, this.store.size.lines))
 
       // Note: Neovim frontend has responsiblity to emit 'GUIEnter' on initialization
       this.client.command('doautocmd <nomodeline> GUIEnter', true)
+
+      this.emit('start')
     })
   }
 
@@ -70,15 +73,18 @@ class Application {
       }
   }
 
-  onDisconnected() {
+  onDisconnect() {
       console.log('disconnected: ' + this.neovim_process.pid);
       this.started = false;
+      this.emit('disconnect')
   }
 
-  finalize() {
+  quit() {
+      if (!this.started)
+        return Promise.resolve()
+      this.started = false
       return this.client.uiDetach().then(() => {
           this.client.quit()
-          this.started = false
       })
   }
 
@@ -126,10 +132,10 @@ class Application {
           case 'set_scroll_region':
               d.dispatch(
                   Action.setScrollRegion({
-                      top: args[0],
+                      top:    args[0],
                       bottom: args[1],
-                      left: args[2],
-                      right: args[3],
+                      left:   args[2],
+                      right:  args[3],
                   }),
               );
               break;
