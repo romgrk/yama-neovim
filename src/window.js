@@ -476,6 +476,7 @@ module.exports = class Window extends EventEmitter {
       return
 
     this.emit('key-press', KeyEvent.fromGdk(event), event)
+    this.resetBlink()
 
     return true
   }
