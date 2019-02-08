@@ -327,8 +327,8 @@ class Screen extends Array {
 
     resize(lines, cols) {
         if (lines < this.size.lines) {
-            const index = this.size.lines - lines
-            this.lines.splice(index, this.lines.length - index)
+            const diff = this.size.lines - lines
+            this.lines.splice(this.lines.length - diff, diff)
         }
         else if (lines > this.size.lines) {
             const diff = lines - this.size.lines
@@ -347,7 +347,7 @@ class Screen extends Array {
     }
 
     put(cursor, token) {
-        if (cursor.line >= this.size.line || cursor.col >= this.size.col)
+        if (cursor.line >= this.size.lines || cursor.col >= this.size.cols)
             throw new Error(`Out of bounds cursor position: line ${cursor.line}, col ${cursor.col}`)
 
         this.lines[cursor.line].insert(cursor.col, token)

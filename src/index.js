@@ -15,8 +15,8 @@ Gdk.init([])
 
 const Application = require('./application.js')
 const Window = require('./window.js')
-const KeyEvent = require('./key-event.js')
 const Store = require('./store.js')
+const KeyEvent = require('./helpers/key-event.js')
 
 const store = new Store()
 const app = new Application(store)
@@ -30,7 +30,7 @@ global.window = window
 /* eslint-enable no-undef */
 // </ for development
 
-window.on('key-press', (event, original) => {
+window.screen.on('key-press', (event, original) => {
   const input = KeyEvent.getVimInput(event)
   const shouldFilter = KeyEvent.shouldFilter(event)
 
