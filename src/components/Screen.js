@@ -168,7 +168,7 @@ module.exports = class Screen extends EventEmitter {
       const x = col  * this.font.cellWidth
       const y = line * this.font.cellHeight
 
-      console.log(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
+      // console.log({ x, y, line, col }, `<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
       context.moveTo(x, y)
       PangoCairo.updateLayout(context, this.pangoLayout)
       PangoCairo.showLayout(context, this.pangoLayout)
@@ -176,11 +176,11 @@ module.exports = class Screen extends EventEmitter {
     else {
       // Draw characters one by one
 
-      console.log({
-        calculatedWidth: this.font.cellWidth * token.text.length,
-        width: width,
-        text: token.text,
-      })
+      /* console.log({
+       *   calculatedWidth: this.font.cellWidth * token.text.length,
+       *   width: width,
+       *   text: token.text,
+       * }) */
       for (let i = 0; i < token.text.length; i++) {
         const char = token.text[i]
 
@@ -188,7 +188,7 @@ module.exports = class Screen extends EventEmitter {
         const x = (col + i)  * this.font.cellWidth
         const y = line * this.font.cellHeight
 
-        console.log(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(char)}</span>`)
+        // console.log({ x, y, line, col, cellWidth: this.font.cellWidth }, `<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(char)}</span>`)
         this.pangoLayout.setMarkup(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(char)}</span>`)
 
         context.moveTo(x, y)
@@ -293,7 +293,6 @@ module.exports = class Screen extends EventEmitter {
 
     const screen = this.store.screen
     const mode = this.store.mode
-    console.log(screen.lines[0])
 
     const {fontFamily, fontSize, lineHeight} = this.store
 
@@ -308,24 +307,20 @@ module.exports = class Screen extends EventEmitter {
     context.fill()
 
     /* Draw tokens */
-    for (let i = 0; i < screen.lines.length; i++) {
-      const line = screen.lines[i]
-      const tokens = line.tokens
-
-      let col = 0
-      for (let j = 0; j < tokens.length; j++) {
-        const token = tokens[j]
-        this.drawText(i, col, token, context)
-        col += token.length
-      }
-    }
+    this.cairoSurface.flush()
+    context.save()
+    context.rectangle(0, 0, this.totalWidth, this.totalHeight)
+    context.clip()
+    context.setSourceSurface(this.cairoSurface, 0, 0)
+    context.paint()
+    context.restore()
 
     /* Draw cursor */
     if (screen.size.lines > 0)
       this.drawCursor(context)
 
     /* Draw grid */
-    if (true) {
+    if (false) {
       let currentY = 0
 
       context.setSourceRgba(1.0, 0, 0, 0.8)
@@ -356,6 +351,21 @@ module.exports = class Screen extends EventEmitter {
 
   onStoreFlush() {
     this.drawingArea.queueDraw()
+
+    const screen = this.store.screen
+
+    /* Draw tokens */
+    for (let i = 0; i < screen.lines.length; i++) {
+      const line = screen.lines[i]
+      const tokens = line.tokens
+
+      let col = 0
+      for (let j = 0; j < tokens.length; j++) {
+        const token = tokens[j]
+        this.drawText(i, col, token, this.cairoContext)
+        col += token.text.length
+      }
+    }
   }
 
   onStoreResize(lines, cols) {
