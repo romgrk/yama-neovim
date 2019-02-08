@@ -28,17 +28,12 @@ module.exports = class Screen extends EventEmitter {
     this.resetBlink = this.resetBlink.bind(this)
     this.blink = this.blink.bind(this)
     this.onStoreFlush = this.onStoreFlush.bind(this)
+    this.onStoreResize = this.onStoreResize.bind(this)
     this.onKeyPressEvent = this.onKeyPressEvent.bind(this)
     this.onDraw = this.onDraw.bind(this)
-    this.onResize = this.onResize.bind(this)
 
     this.totalWidth  = 200
     this.totalHeight = 300
-
-    this.cellWidth   = 10
-    this.cellHeight  = 15
-
-    this.cursorThickness = 2
 
     this.updateDimensions(this.store.size.lines, this.store.size.cols)
 
@@ -64,40 +59,20 @@ module.exports = class Screen extends EventEmitter {
 
     // Start listening to events
     this.store.on('flush', this.onStoreFlush)
-    this.store.on('resize', this.onResize)
+    this.store.on('resize', this.onStoreResize)
     this.store.on('cursor', this.resetBlink)
 
     // Cursor blink
     this.resetBlink()
   }
 
-  tryResize() {
-    const fd = Pango.fontDescriptionFromString(`${this.store.fontFamily} ${this.store.fontSize}px`)
-    const {cellWidth, cellHeight} = Font.parse(fd)
-    const width  = this.drawingArea.getAllocatedWidth()
-    const height = this.drawingArea.getAllocatedHeight()
-    const lines = Math.floor(height / cellHeight)
-    const cols  = Math.floor(width / cellWidth)
-
-    this.application.client.uiTryResize(cols, lines)
-  }
-
   updateDimensions(lines, cols) {
-    // Create font details
-    const font = {}
-    font.string = `${this.store.fontFamily} ${this.store.fontSize}px`
-    font.description = Pango.fontDescriptionFromString(font.string)
-    font.doubleWidthChars = Font.getDoubleWidthCodePoints(font.description)
+    // Parse font details
+    this.font = Font.parse(`${this.store.fontFamily} ${this.store.fontSize}px`)
 
-    this.font = font
-
-    const {cellWidth, cellHeight, normalWidth, boldWidth} = Font.parse(this.font.description)
-
-    // calculate the letter_spacing required to make bold have the same width as normal
-    this.boldSpacing = normalWidth - boldWidth
     // calculate the total pixel width/height of the drawing area
-    this.totalWidth  = cellWidth * cols
-    this.totalHeight = cellHeight * lines
+    this.totalWidth  = this.font.cellWidth  * cols
+    this.totalHeight = this.font.cellHeight * lines
 
     this.cairoSurface = new Cairo.ImageSurface(Cairo.Format.RGB24,
                                                     this.totalWidth,
@@ -106,8 +81,6 @@ module.exports = class Screen extends EventEmitter {
     this.pangoLayout = PangoCairo.createLayout(this.cairoContext)
     this.pangoLayout.setAlignment(Pango.Alignment.LEFT)
     this.pangoLayout.setFontDescription(this.font.description)
-    this.cellWidth = cellWidth
-    this.cellHeight = cellHeight
     // this.window.resize(this.totalWidth, this.totalHeight)
   }
 
@@ -134,7 +107,7 @@ module.exports = class Screen extends EventEmitter {
   }
 
   getPosition(line, col) {
-    return [col * this.cellWidth, line * this.cellHeight]
+    return [col * this.font.cellWidth, line * this.font.cellHeight]
   }
 
   getPangoAttributes(attr) {
@@ -167,8 +140,8 @@ module.exports = class Screen extends EventEmitter {
             break
           case 'bold':
             pangoAttrs.font_weight = 'bold'
-            if (this.boldSpacing)
-              pangoAttrs.letter_spacing = String(this.boldSpacing)
+            if (this.font.boldSpacing)
+              pangoAttrs.letter_spacing = String(this.font.boldSpacing)
             break
           case 'underline':
             pangoAttrs.underline = 'single'
@@ -186,14 +159,14 @@ module.exports = class Screen extends EventEmitter {
     this.pangoLayout.setMarkup(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
 
     const {width} = this.pangoLayout.getPixelExtents()[1]
-    const calculatedWidth = this.cellWidth * token.text.length
+    const calculatedWidth = this.font.cellWidth * token.text.length
 
 
     // Draw text
 
     if (width <= (calculatedWidth + 1) && width >= (calculatedWidth - 1)) {
-      const x = col  * this.cellWidth
-      const y = line * this.cellHeight
+      const x = col  * this.font.cellWidth
+      const y = line * this.font.cellHeight
 
       console.log(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
       context.moveTo(x, y)
@@ -204,7 +177,7 @@ module.exports = class Screen extends EventEmitter {
       // Draw characters one by one
 
       console.log({
-        calculatedWidth: this.cellWidth * token.text.length,
+        calculatedWidth: this.font.cellWidth * token.text.length,
         width: width,
         text: token.text,
       })
@@ -212,8 +185,8 @@ module.exports = class Screen extends EventEmitter {
         const char = token.text[i]
 
         // Draw text
-        const x = (col + i)  * this.cellWidth
-        const y = line * this.cellHeight
+        const x = (col + i)  * this.font.cellWidth
+        const y = line * this.font.cellHeight
 
         console.log(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(char)}</span>`)
         this.pangoLayout.setMarkup(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(char)}</span>`)
@@ -258,10 +231,10 @@ module.exports = class Screen extends EventEmitter {
     const cursor = this.store.cursor
 
     context.rectangle(
-      cursor.col * this.cellWidth,
-      (cursor.line + 1) * this.cellHeight - this.cursorThickness,
-      this.cellWidth,
-      this.cursorThickness
+      cursor.col * this.font.cellWidth,
+      (cursor.line + 1) * this.font.cellHeight - this.store.cursorThickness,
+      this.font.cellWidth,
+      this.store.cursorThickness
     )
     context.fill()
   }
@@ -273,10 +246,10 @@ module.exports = class Screen extends EventEmitter {
     const cursor = this.store.cursor
 
     context.rectangle(
-      cursor.col * this.cellWidth,
-      cursor.line * this.cellHeight,
-      this.cursorThickness,
-      this.cellHeight
+      cursor.col * this.font.cellWidth,
+      cursor.line * this.font.cellHeight,
+      this.store.cursorThickness,
+      this.font.cellHeight
     )
     context.fill()
   }
@@ -308,10 +281,10 @@ module.exports = class Screen extends EventEmitter {
     const cursor = this.store.cursor
 
     context.rectangle(
-      cursor.col * this.cellWidth,
-      cursor.line * this.cellHeight,
-      this.cellWidth,
-      this.cellHeight
+      cursor.col * this.font.cellWidth,
+      cursor.line * this.font.cellHeight,
+      this.font.cellWidth,
+      this.font.cellHeight
     )
     context.stoke()
   }
@@ -368,13 +341,13 @@ module.exports = class Screen extends EventEmitter {
 
         for (let j = 0; j < screen.size.cols; j++) {
           context.moveTo(currentX, currentY)
-          context.lineTo(currentX, currentY + this.cellHeight)
+          context.lineTo(currentX, currentY + this.font.cellHeight)
           context.stroke()
 
-          currentX += this.cellWidth
+          currentX += this.font.cellWidth
         }
 
-        currentY += this.cellHeight
+        currentY += this.font.cellHeight
       }
     }
 
@@ -385,7 +358,7 @@ module.exports = class Screen extends EventEmitter {
     this.drawingArea.queueDraw()
   }
 
-  onResize(lines, cols) {
+  onStoreResize(lines, cols) {
     this.updateDimensions(lines, cols)
   }
 

@@ -93,6 +93,7 @@ module.exports = class NeovimStore extends EventEmitter {
         this.backgroundColor = 'black'
         this.specialColor = 'blue'
         this.cursorColor = '#888888'
+        this.cursorThickness = 2
         this.modeInfo = {}
         this.mode = 'normal'
         this.busy = false

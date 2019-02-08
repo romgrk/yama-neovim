@@ -12,10 +12,13 @@ module.exports = {
   getDoubleWidthCodePoints,
 }
 
-function parse(fontDescription) {
+function parse(string) {
+  const description = Pango.fontDescriptionFromString(string)
+
+  /* Calculate dimensions */
   const cr = new Cairo.Context(new Cairo.ImageSurface(Cairo.Format.RGB24, 300, 300))
   const layout = PangoCairo.createLayout(cr)
-  layout.setFontDescription(fontDescription)
+  layout.setFontDescription(description)
   layout.setAlignment(Pango.Alignment.LEFT)
 
   layout.setMarkup('<span font_weight="bold">A</span>')
@@ -23,10 +26,22 @@ function parse(fontDescription) {
 
   layout.setMarkup('<span>A</span>')
   const [normalWidth] = layout.getSize()
-
   const [cellWidth, cellHeight] = layout.getPixelSize()
 
-  return { cellWidth, cellHeight, normalWidth, boldWidth }
+  const boldSpacing = normalWidth - boldWidth
+
+  /* Find double-width chars */
+  const doubleWidthChars = getDoubleWidthCodePoints(description)
+
+  return {
+    string,
+    description,
+    cellWidth,
+    cellHeight,
+    normalWidth,
+    boldWidth,
+    boldSpacing,
+  }
 }
 
 function getDoubleWidthCodePoints(fontDescription, range = [0x20, 50000]) {

@@ -82,8 +82,7 @@ class Window extends EventEmitter {
   }
 
   tryResize() {
-    const fd = Pango.fontDescriptionFromString(`${this.store.fontFamily} ${this.store.fontSize}px`)
-    const {cellWidth, cellHeight} = Font.parse(fd)
+    const {cellWidth, cellHeight} = Font.parse(`${this.store.fontFamily} ${this.store.fontSize}px`)
     const width  = this.screen.element.getAllocatedWidth()
     const height = this.screen.element.getAllocatedHeight()
     const lines = Math.floor(height / cellHeight)
