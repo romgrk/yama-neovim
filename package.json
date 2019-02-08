@@ -4,6 +4,7 @@
   "description": "A neovim UI using node-gtk",
   "main": "src/index.js",
   "scripts": {
+    "start": "node .",
     "test": "jest"
   },
   "repository": {
