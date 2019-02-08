@@ -405,7 +405,7 @@ module.exports = class Window extends EventEmitter {
     const screen = this.store.screen
     const cursor = this.store.cursor
 
-    const token = screen.getTokenAt(cursor.line, cursor.col) || { text: '' }
+    const token = screen.tokenForCharAt(cursor.line, cursor.col) || { text: '' }
 
     const text = token.text || ' '
     const attr = token.attr || EMPTY_OBJECT
