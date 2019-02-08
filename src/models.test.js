@@ -14,22 +14,12 @@ describe('Line', () => {
     })
 
     describe('.slice(start, end)', () => {
-        test('empty line', () => {
-            const line = new Line(80, [])
-            const tokens = line.slice(10, 20)
-
-            expect(line.tokens).toEqual([
-                { text: '          ', attr: null },
-            ])
-        })
-
-        test('non-empty line', () => {
-            const line = new Line(80, [ { text: 'a'.repeat(20) } ])
-            const tokens = line.slice(10, 30)
+        test('inside token', () => {
+            const line = new Line(30, [{ text: '012345678901234567890123456789', attr: null }])
+            const tokens = line.slice(5, 15)
 
             expect(tokens).toEqual([
-                { text: 'a'.repeat(10) },
-                { text: ' '.repeat(10), attr: null },
+                { text: '567890123456789', attr: null },
             ])
         })
 
@@ -45,34 +35,84 @@ describe('Line', () => {
                 { text: 'second' }
             ])
         })
+
+        test('at token end', () => {
+            const line = new Line(20, [ { text: 'a'.repeat(20), attr: null } ])
+            const tokens = line.slice(10, 20)
+
+            expect(tokens).toEqual([
+                { text: 'a'.repeat(10), attr: null },
+            ])
+        })
+
+        test('at token start', () => {
+            const line = new Line(20, [
+                { text: 'a'.repeat(10), attr: null },
+                { text: 'b'.repeat(10), attr: null },
+            ])
+            const tokens = line.slice(10, 15)
+
+            expect(tokens).toEqual([
+                { text: 'b'.repeat(5), attr: null },
+            ])
+        })
+
+    })
+
+    describe('.tokenForCharAt(position)', () => {
+        test('inside initial tokens', () => {
+            const line = new Line(20, [
+                { text: 'aaaa', attr: null },
+                { text: '1234', attr: null },
+                { text: 'cccc', attr: null },
+            ])
+
+            const token = line.tokenForCharAt(5)
+
+            expect(token).toEqual({ text: '2', attr: null })
+        })
+
+        test('after initial tokens', () => {
+            const line = new Line(20, [
+                { text: 'aaaa', attr: null },
+                { text: '1234', attr: null },
+                { text: 'cccc', attr: null },
+            ])
+
+            const token = line.tokenForCharAt(15)
+
+            expect(token).toEqual({ text: ' ', attr: null })
+        })
     })
 
     describe('.insert(position, token)', () => {
         test('at tokens end', () => {
-            const line = new Line(80, [ { text: 'aaaa' } ])
+            const line = new Line(20, [ { text: 'aaaa' } ])
             const token = { text: 'bbbb' }
             line.insert(4, token)
 
             expect(line.tokens).toEqual([
                 { text: 'aaaa' },
                 { text: 'bbbb' },
+                { text: ' '.repeat(12), attr: null },
             ])
         })
 
         test('after tokens end', () => {
-            const line = new Line(80, [ { text: 'aaaa' } ])
-            const token = { text: 'bbbb' }
-            line.insert(8, token)
+            const line = new Line(20, [ { text: 'aaaaa' } ])
+            const token = { text: 'bbbbb' }
+            line.insert(10, token)
 
             expect(line.tokens).toEqual([
-                { text: 'aaaa' },
-                { text: '    ', attr: null },
-                { text: 'bbbb' },
+                { text: 'aaaaa' },
+                { text: '     ', attr: null },
+                { text: 'bbbbb' },
+                { text: '     ', attr: null },
             ])
         })
 
         test('inside start token boundary', () => {
-            const line = new Line(80, [
+            const line = new Line(20, [
                 { text: 'aaaa' },
                 { text: 'bbbb' },
                 { text: 'cccc' },
@@ -84,11 +124,12 @@ describe('Line', () => {
                 { text: 'aa' },
                 { text: '112222' },
                 { text: 'cccc' },
+                { text: ' '.repeat(8), attr: null },
             ])
         })
 
         test('inside end token boundary', () => {
-            const line = new Line(80, [
+            const line = new Line(20, [
                 { text: 'aaaa' },
                 { text: 'bbbb' },
                 { text: 'cccc' },
@@ -100,11 +141,12 @@ describe('Line', () => {
                 { text: 'aaaa' },
                 { text: '111122' },
                 { text: 'cc' },
+                { text: ' '.repeat(8), attr: null },
             ])
         })
 
         test('inside start-end tokens boundary', () => {
-            const line = new Line(80, [
+            const line = new Line(20, [
                 { text: 'aaaa' },
                 { text: 'bbbb' },
                 { text: 'cccc' },
@@ -118,11 +160,12 @@ describe('Line', () => {
                 { text: 'bb' },
                 { text: '11222233' },
                 { text: 'dd' },
+                { text: ' '.repeat(4), attr: null },
             ])
         })
 
         test('inside same start-end token boundary', () => {
-            const line = new Line(80, [
+            const line = new Line(20, [
                 { text: 'aaaa' },
                 { text: 'bbbb' },
                 { text: 'cccc' },
@@ -136,18 +179,20 @@ describe('Line', () => {
                 { text: '11' },
                 { text: 'b' },
                 { text: 'cccc' },
+                { text: ' '.repeat(8), attr: null },
             ])
         })
 
         test('at start and after token list end', () => {
-            const line = new Line(80, [
+            const line = new Line(20, [
                 { text: 'aaaa' },
             ])
             const token = { text: '111111' }
             line.insert(0, token)
 
             expect(line.tokens).toEqual([
-                { text: '111111' }
+                { text: '111111' },
+                { text: ' '.repeat(14), attr: null },
             ])
         })
 
@@ -166,48 +211,11 @@ describe('Line', () => {
             line.insert(0, token)
 
             expect(line.tokens).toEqual([
-                { text: '1 %a   "[No Name]"                    line 1', attr: { fg: 'white' } }
+                { text: '1 %a   "[No Name]"                    line 1', attr: { fg: 'white' } },
+                { text: '      ', attr: null }
             ])
         })
     })
-
-    describe('.insertTokens(position, tokens)', () => {
-        test('inside line', () => {
-            const line = new Line(80, [
-                { text: 'a'.repeat(80) }
-            ])
-            const tokens = [
-                { text: 'bbbb' },
-                { text: 'cccc' },
-            ]
-            line.insertTokens(10, tokens)
-
-            expect(line.tokens).toEqual([
-                { text: 'aaaaaaaaaa' },
-                { text: 'bbbb' },
-                { text: 'cccc' },
-                { text: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
-            ])
-        })
-
-        test('replace line', () => {
-            const line = new Line(50, [
-                { text: ':' },
-                { text: 'l' },
-                { text: 's' },
-                { text: ' '.repeat(47) },
-            ])
-            const tokens = [
-                { text: 'b'.repeat(50) },
-            ]
-            line.insertTokens(0, tokens)
-
-            expect(line.tokens).toEqual([
-                { text: 'b'.repeat(50) },
-            ])
-        })
-    })
-
 
     describe('.setLength(length)', () => {
         test('with larger than current', () => {

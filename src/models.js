@@ -13,11 +13,15 @@ class Token {
 
 class Line {
     constructor(length, tokens = []) {
+        this._validateLength(length)
         this.length = length
         this.tokens = tokens
+        this._fill()
     }
 
     setLength(length) {
+        this._validateLength(length)
+
         if (this.length > length) {
 
             let index
@@ -46,6 +50,10 @@ class Line {
                 charCount += tokenLength
             }
         }
+        else if (this.length < length) {
+            this._fill()
+        }
+
         this.length = length
     }
 
@@ -57,45 +65,155 @@ class Line {
         return text
     }
 
-    append(token) {
-        this.tokens.push(token)
+    clear(position = 0) {
+        if (position === 0) {
+            this.tokens.splice(0, this.tokens.length)
+        }
+        else {
+            const length = this.length - position
+            const {startIndex, endIndex} = this._prepareInsertion(position, length)
+            const deleteCount = (endIndex + 1) - startIndex
+
+            this.tokens.splice(startIndex, deleteCount)
+        }
+
+        this._fill()
     }
 
     slice(start, end) {
-        const {startIndex, endIndex} = this._prepareSlice(start, end - start)
+        let index
+        let startIndex
+        let endIndex
+        let currentToken
+        let currentTokenEnd = 0
+        let charCount = 0
 
-        // FIXME(performance: implement this without mutation)
-        const result = this.tokens.slice(startIndex, endIndex + 1)
-        this._normalize()
+        const positions = []
+
+        // Calculate start & end tokens index, and gather positions
+        for (index = 0; index < this.tokens.length; index++) {
+            positions.push(charCount)
+            currentToken = this.tokens[index]
+            currentTokenEnd = charCount + currentToken.text.length
+
+            const isPastStart = charCount + currentToken.text.length - 1 >= start
+
+            if (isPastStart && startIndex === undefined) {
+                startIndex = index
+            }
+
+            if (isPastStart && isInRange(end, charCount, currentTokenEnd)) {
+                endIndex = index
+                break;
+            }
+
+            charCount += currentToken.text.length
+        }
+
+
+        const result = []
+
+        // Slice over one or more tokens
+        //      start            end
+        //         |--------------|
+        // [aaaa][bbbbb][ccccc][ddddd]
+        const startToken = this.tokens[startIndex]
+        const endToken = this.tokens[endIndex]
+
+        if (start > positions[startIndex]) {
+            const breakPoint = start - positions[startIndex]
+            const textBefore = startToken.text.slice(0, breakPoint)
+            const textAfter  = startToken.text.slice(breakPoint)
+
+            result.push({ text: textAfter, attr: startToken.attr })
+        }
+        else {
+            result.push(startToken)
+        }
+
+        for (let i = startIndex + 1; i < endIndex; i++) {
+            result.push(this.tokens[i])
+        }
+
+        const endTokenEnd = positions[endIndex] + endToken.text.length
+
+        if (end < endTokenEnd) {
+
+            //  123456789
+            //  ..|---|..
+            // [abcdefghi]
+            if (startIndex === endIndex) {
+                const breakPoint = result[0].text.length - (end - start)
+                const textBefore = result[0].text.slice(0, breakPoint)
+                result[0].text = textBefore
+            }
+            else {
+                const breakPoint = endToken.text.length - (endTokenEnd - end)
+                const textBefore = endToken.text.slice(0, breakPoint)
+                result.push({ text: textBefore, attr: endToken.attr })
+            }
+        }
+        else if (startIndex !== endIndex) {
+            result.push(endToken)
+        }
+
         return result
     }
 
+    tokenForCharAt(position) {
+        if (position < 0 || position >= this.length)
+            throw new Error('Out of bounds position')
+
+        let currentToken
+        let currentTokenEnd = 0
+        let charCount = 0
+
+        //  0123  45678
+        //  ....  .|...
+        // [aaaa][bbbbb]
+
+        for (let index = 0; index < this.tokens.length; index++) {
+            currentToken = this.tokens[index]
+            currentTokenEnd = charCount + currentToken.text.length - 1
+
+            const isInsideToken = currentTokenEnd >= position
+
+            if (isInsideToken) {
+                const innerIndex = position - charCount
+                return { text: currentToken.text.charAt(innerIndex), attr: currentToken.attr }
+            }
+
+            charCount += currentToken.text.length
+        }
+    }
+
+    insertTokens(position, tokens) {
+        const length = tokens.reduce((length, t) => length + t.text.length, 0)
+        const {startIndex, endIndex} = this._prepareInsertion(position, length)
+        const deleteCount = (endIndex + 1) - startIndex
+        //  0123  45678
+        //  ....  .|...
+        // [aaaa][bbbbb]
+
+        this.tokens.splice(startIndex, deleteCount, ...tokens)
+    }
+
     insert(position, token) {
-        const {startIndex, endIndex} = this._prepareSlice(position, token.text.length)
+        const {startIndex, endIndex} = this._prepareInsertion(position, token.text.length)
         const deleteCount = (endIndex + 1) - startIndex
 
         this.tokens.splice(startIndex, deleteCount, token)
     }
 
-    insertTokens(position, tokens) {
-        const length = tokens.reduce((length, t) => length + t.text.length, 0)
-        const {startIndex, endIndex} = this._prepareSlice(position, length)
-        const deleteCount = (endIndex + 1) - startIndex
-
-        this.tokens.splice(startIndex, deleteCount, ...tokens)
-    }
-
-    clear(position = 0) {
-        if (position === 0) {
-            this.tokens.splice(0, this.tokens.length)
-            return
+    _fill() {
+        let textLength = 0
+        for (let i = 0; i < this.tokens.length; i++) {
+            textLength +=  this.tokens[i].text.length
         }
-
-        const length = this.length - position
-        const {startIndex, endIndex} = this._prepareSlice(position, length)
-        const deleteCount = (endIndex + 1) - startIndex
-
-        this.tokens.splice(startIndex, deleteCount)
+        const diff = this.length - textLength
+        if (diff > 0) {
+            this.tokens.push({ text: ' '.repeat(diff), attr: null })
+        }
     }
 
     _normalize() {
@@ -114,7 +232,7 @@ class Line {
         }
     }
 
-    _prepareSlice(position, length) {
+    _prepareInsertion(position, length) {
         let index
         let startIndex
         let endIndex
@@ -148,18 +266,6 @@ class Line {
             charCount += currentToken.text.length
         }
 
-        // Insert token at or after the end of current tokens
-        //        position
-        //            |---->[1111]
-        // [aaaa][bbbb]
-        if (startIndex === undefined) {
-            const diff = position - currentTokenEnd
-            if (diff > 0) {
-                this.tokens.push({ text: ' '.repeat(diff), attr: null })
-            }
-            return { startIndex: this.tokens.length, endIndex: this.tokens.length }
-        }
-
 
         // Insert token over one or more tokens
         //     position         + length
@@ -182,32 +288,29 @@ class Line {
                 endIndex += 1
         }
 
-        if (endIndex === undefined) {
-            if (positionEnd >= charCount) {
-                const diff = positionEnd - charCount
-                if (diff > 0) {
-                    this.tokens.push({ text: ' '.repeat(diff), attr: null })
-                }
-            }
-            endIndex = this.tokens.length - 1
-        }
-        else if (endIndex !== undefined) {
-            const endToken = this.tokens[endIndex]
-            const endTokenEnd = positions[endIndex] + endToken.text.length
 
-            if (positionEnd < endTokenEnd) {
-                const breakPoint = endToken.text.length - (endTokenEnd - positionEnd)
-                const textBefore = endToken.text.slice(0, breakPoint)
-                const textAfter  = endToken.text.slice(breakPoint)
+        const endToken = this.tokens[endIndex]
+        const endTokenEnd = positions[endIndex] + endToken.text.length
 
-                positions.splice(endIndex, 1, textBefore.length, textAfter.length)
-                this.tokens.splice(endIndex, 1,
-                    { ...endToken, text: textBefore },
-                    { ...endToken, text: textAfter })
-            }
+        if (positionEnd < endTokenEnd) {
+            const breakPoint = endToken.text.length - (endTokenEnd - positionEnd)
+            const textBefore = endToken.text.slice(0, breakPoint)
+            const textAfter  = endToken.text.slice(breakPoint)
+
+            positions.splice(endIndex, 1, textBefore.length, textAfter.length)
+            this.tokens.splice(endIndex, 1,
+                { ...endToken, text: textBefore },
+                { ...endToken, text: textAfter })
         }
 
         return { startIndex, endIndex }
+    }
+
+    _validateLength(length) {
+        if (typeof length !== 'number')
+            throw new TypeError('length argument must be a number')
+        if (length <= 0)
+            throw new Error('length must be positive')
     }
 }
 
