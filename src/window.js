@@ -15,6 +15,7 @@ const PangoCairo = gi.require('PangoCairo')
 
 const Actions = require('./actions.js')
 const KeyEvent = require('./key-event.js')
+const Font = require('./helpers/font.js')
 
 const EMPTY_OBJECT = {}
 
@@ -76,6 +77,7 @@ module.exports = class Window extends EventEmitter {
 
     this.cursorThickness = 2
 
+    this.updateDimensions(this.store.size.lines, this.store.size.cols)
     this.initialize()
   }
 
@@ -187,14 +189,43 @@ module.exports = class Window extends EventEmitter {
   }
 
   tryResize() {
-    const font = `${this.store.fontFamily} ${this.store.fontSize}px`
-    const {cellWidth, cellHeight} = parseFont(Pango.fontDescriptionFromString(font))
+    const fd = Pango.fontDescriptionFromString(`${this.store.fontFamily} ${this.store.fontSize}px`)
+    const {cellWidth, cellHeight} = Font.parse(fd)
     const width  = this.drawingArea.getAllocatedWidth()
     const height = this.drawingArea.getAllocatedHeight()
     const lines = Math.floor(height / cellHeight)
     const cols  = Math.floor(width / cellWidth)
 
     this.application.client.uiTryResize(cols, lines)
+  }
+
+  updateDimensions(lines, cols) {
+    // Create font details
+    const font = {}
+    font.string = `${this.store.fontFamily} ${this.store.fontSize}px`
+    font.description = Pango.fontDescriptionFromString(font.string)
+    font.doubleWidthChars = Font.getDoubleWidthCodePoints(font.description)
+
+    this.font = font
+
+    const {cellWidth, cellHeight, normalWidth, boldWidth} = Font.parse(this.font.description)
+
+    // calculate the letter_spacing required to make bold have the same width as normal
+    this.boldSpacing = normalWidth - boldWidth
+    // calculate the total pixel width/height of the drawing area
+    this.totalWidth  = cellWidth * cols
+    this.totalHeight = cellHeight * lines
+
+    this.cairoSurface = new Cairo.ImageSurface(Cairo.Format.RGB24,
+                                                    this.totalWidth,
+                                                    this.totalHeight)
+    this.cairoContext = new Cairo.Context(this.cairoSurface)
+    this.pangoLayout = PangoCairo.createLayout(this.cairoContext)
+    this.pangoLayout.setAlignment(Pango.Alignment.LEFT)
+    this.pangoLayout.setFontDescription(this.font.description)
+    this.cellWidth = cellWidth
+    this.cellHeight = cellHeight
+    // this.window.resize(this.totalWidth, this.totalHeight)
   }
 
   resetBlink() {
@@ -266,31 +297,49 @@ module.exports = class Window extends EventEmitter {
     return Object.keys(pangoAttrs).map(key => `${key}="${pangoAttrs[key]}"`).join(' ')
   }
 
-  drawText(line, col, tokens, context) {
-    const markups = []
+  drawText(line, col, token, context) {
 
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i]
-      const text = token.text.replace(/<|>|&/g, m => {
-        switch (m) {
-          case '<': return '&lt;'
-          case '>': return '&gt;'
-          case '&': return '&amp;'
-        }
-        return m
-      })
-      markups.push(`<span ${this.getPangoAttributes(token.attr || {})}>${text}</span>`)
-    }
+    // console.log(token)
+    this.pangoLayout.setMarkup(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
 
-    this.pangoLayout.setMarkup(markups.join(''))
+    const {width} = this.pangoLayout.getPixelExtents()[1]
+    const calculatedWidth = this.cellWidth * token.text.length
+
 
     // Draw text
-    const x = col  * this.cellWidth
-    const y = line * this.cellHeight
 
-    context.moveTo(x, y)
-    PangoCairo.updateLayout(context, this.pangoLayout)
-    PangoCairo.showLayout(context, this.pangoLayout)
+    if (width <= (calculatedWidth + 1) && width >= (calculatedWidth - 1)) {
+      const x = col  * this.cellWidth
+      const y = line * this.cellHeight
+
+      console.log(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
+      context.moveTo(x, y)
+      PangoCairo.updateLayout(context, this.pangoLayout)
+      PangoCairo.showLayout(context, this.pangoLayout)
+    }
+    else {
+      // Draw characters one by one
+
+      console.log({
+        calculatedWidth: this.cellWidth * token.text.length,
+        width: width,
+        text: token.text,
+      })
+      for (let i = 0; i < token.text.length; i++) {
+        const char = token.text[i]
+
+        // Draw text
+        const x = (col + i)  * this.cellWidth
+        const y = line * this.cellHeight
+
+        console.log(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(char)}</span>`)
+        this.pangoLayout.setMarkup(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(char)}</span>`)
+
+        context.moveTo(x, y)
+        PangoCairo.updateLayout(context, this.pangoLayout)
+        PangoCairo.showLayout(context, this.pangoLayout)
+      }
+    }
   }
 
   drawCursor(context) {
@@ -366,7 +415,7 @@ module.exports = class Window extends EventEmitter {
 
     const cursorToken = { text, attr: { ...attr, fg: bg, bg: fg } }
 
-    this.drawText(cursor.line, cursor.col, [cursorToken], context)
+    this.drawText(cursor.line, cursor.col, cursorToken, context)
   }
 
   drawCursorBlockOutline(context, blink) {
@@ -388,6 +437,7 @@ module.exports = class Window extends EventEmitter {
 
     const screen = this.store.screen
     const mode = this.store.mode
+    console.log(screen.lines[0])
 
     const {fontFamily, fontSize, lineHeight} = this.store
 
@@ -405,7 +455,13 @@ module.exports = class Window extends EventEmitter {
     for (let i = 0; i < screen.lines.length; i++) {
       const line = screen.lines[i]
       const tokens = line.tokens
-      this.drawText(i, 0, tokens, context)
+
+      let col = 0
+      for (let j = 0; j < tokens.length; j++) {
+        const token = tokens[j]
+        this.drawText(i, col, token, context)
+        col += token.length
+      }
     }
 
     /* Draw cursor */
@@ -413,7 +469,7 @@ module.exports = class Window extends EventEmitter {
       this.drawCursor(context)
 
     /* Draw grid */
-    if (false) {
+    if (true) {
       let currentY = 0
 
       context.setSourceRgba(1.0, 0, 0, 0.8)
@@ -447,28 +503,7 @@ module.exports = class Window extends EventEmitter {
   }
 
   onResize(lines, cols) {
-
-    // create FontDescription object for the selected font/size
-    const font = `${this.store.fontFamily} ${this.store.fontSize}px`
-    this.fontDescription = Pango.fontDescriptionFromString(font)
-    const {cellWidth, cellHeight, normalWidth, boldWidth} = parseFont(this.fontDescription)
-
-    // calculate the letter_spacing required to make bold have the same width as normal
-    this.boldSpacing = normalWidth - boldWidth
-    // calculate the total pixel width/height of the drawing area
-    this.totalWidth  = cellWidth * cols
-    this.totalHeight = cellHeight * lines
-
-    this.cairoSurface = new Cairo.ImageSurface(Cairo.Format.RGB24,
-                                                    this.totalWidth,
-                                                    this.totalHeight)
-    this.cairoContext = new Cairo.Context(this.cairoSurface)
-    this.pangoLayout = PangoCairo.createLayout(this.cairoContext)
-    this.pangoLayout.setAlignment(Pango.Alignment.LEFT)
-    this.pangoLayout.setFontDescription(this.fontDescription)
-    this.cellWidth = cellWidth
-    this.cellHeight = cellHeight
-    // this.window.resize(this.totalWidth, this.totalHeight)
+    this.updateDimensions(lines, cols)
   }
 
   onKeyPressEvent(event) {
@@ -485,19 +520,6 @@ module.exports = class Window extends EventEmitter {
 /*
  * Helpers
  */
-
-// if link doesn't have a protocol, prefixes it via http://
-function url(href) {
-  return /^([a-z]{2,}):/.test(href) ? href : ('http://' + href)
-}
-
-function countUtf8Bytes(s){
-  let b = 0
-  let i = 0
-  let c
-  for (; c = s.charCodeAt(i++); b += c >> 11 ? 3 : c >> 7 ? 2 : 1);
-  return b
-}
 
 function colorToHex(color) {
   if (color.charAt(0) === '#')
@@ -521,15 +543,13 @@ function setContextColorFromHex(context, hex) {
   context.setSourceRgb(r, g, b)
 }
 
-function parseFont(fontDescription) {
-  const cr = new Cairo.Context(new Cairo.ImageSurface(Cairo.Format.RGB24, 300, 300))
-  const layout = PangoCairo.createLayout(cr)
-  layout.setFontDescription(fontDescription)
-  layout.setAlignment(Pango.Alignment.LEFT)
-  layout.setMarkup('<span font_weight="bold">A</span>')
-  const [boldWidth] = layout.getSize()
-  layout.setMarkup('<span>A</span>')
-  const [cellWidth, cellHeight] = layout.getPixelSize()
-  const [normalWidth] = layout.getSize()
-  return { cellWidth, cellHeight, normalWidth, boldWidth }
+function escapeMarkup(text) {
+  return text.replace(/<|>|&/g, m => {
+    switch (m) {
+      case '<': return '&lt;'
+      case '>': return '&gt;'
+      case '&': return '&amp;'
+    }
+    return m
+  })
 }

@@ -22,6 +22,13 @@ const store = new Store()
 const app = new Application(store)
 const window = new Window(store, app)
 
+// for development
+/* eslint-disable no-undef */
+global.store = store
+global.app = app
+global.window = window
+/* eslint-enable no-undef */
+// </ for development
 
 window.on('key-press', (event, original) => {
   const input = KeyEvent.getVimInput(event)
@@ -48,12 +55,11 @@ app.start(
     '--embed',
     '--headless',
     '--cmd', 'set termguicolors',
-    // '-u', 'NORC'
+    '-u', 'NORC',
+    './test.txt'
   ],
   20,
   50
 )
 
 window.show()
-
-
