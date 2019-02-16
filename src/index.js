@@ -2,6 +2,7 @@
  * index.js
  */
 
+const path = require('path')
 const util = require('util')
 util.inspect.defaultOptions = { breakLength: 180 }
 
@@ -22,13 +23,13 @@ const store = new Store()
 const app = new Application(store)
 const window = new Window(store, app)
 
-// for development
+// <for development>
 /* eslint-disable no-undef */
 global.store = store
 global.app = app
 global.window = window
 /* eslint-enable no-undef */
-// </ for development
+// </for development>
 
 window.screen.on('key-press', (event, original) => {
   const input = KeyEvent.getVimInput(event)
@@ -55,6 +56,7 @@ app.start(
     '--embed',
     '--headless',
     '--cmd', 'set termguicolors',
+    '--cmd', 'source ' + path.join(Application.getRuntimeDirectory(), 'init.vim'),
     '-u', 'NORC',
     './test.txt'
   ],

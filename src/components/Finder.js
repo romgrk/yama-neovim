@@ -6,9 +6,15 @@
 const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
 
+const KeyEvent = require('../helpers/key-event.js')
+
 
 class Finder {
   constructor() {
+
+    this.onKeyPress = this.onKeyPress.bind(this)
+
+
     this.element = new Gtk.Box({
       orientation: Gtk.Orientation.VERTICAL,
       halign: Gtk.Align.CENTER,
@@ -23,11 +29,7 @@ class Finder {
     this.element.add(this.input)
     this.element.add(this.scrollWindow)
 
-    this.setChildren([
-      new Gtk.Label({ label: 'Item 1' }),
-      new Gtk.Label({ label: 'Item 2' }),
-      new Gtk.Label({ label: 'Item 3' }),
-    ])
+    this.input.on('key-press-event', this.onKeyPress)
   }
 
   setChildren(children) {
@@ -41,6 +43,28 @@ class Finder {
       row.add(child)
       this.listBox.add(row)
     })
+  }
+
+  show() {
+    this.element.show()
+    this.element.focus()
+  }
+
+  hide() {
+    this.element.hide()
+  }
+
+  onKeyPress(gdkKeyEvent) {
+    const event = KeyEvent.fromGdk(gdkKeyEvent)
+
+    console.log(event)
+
+    if (event.name === 'Escape') {
+      this.hide()
+      return true
+    }
+
+    return false
   }
 }
 

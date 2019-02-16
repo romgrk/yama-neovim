@@ -3,14 +3,22 @@
  */
 
 
+const path = require('path')
 const child_process = require('child_process')
 const EventEmitter = require('events')
 const chalk = require('chalk')
 const { attach } = require('promised-neovim-client')
 
-const Action = require('./actions.js')
+const UI = require('./actions/ui.js')
+const Command = require('./actions/command.js')
+
 
 class Application extends EventEmitter {
+
+  static getRuntimeDirectory() {
+    return path.join(__dirname, '../runtime/')
+  }
+
 
   constructor(store) {
     super()
@@ -61,16 +69,27 @@ class Application extends EventEmitter {
   }
 
   onNotified(method, args) {
-      if (method === 'redraw') {
-          try { // FIXME(remove)
-            this.redraw(args);
-          } catch (err) {
-            console.error(err);
-          }
-      } else {
-          // User defined notifications are passed here.
-          console.log('Unknown method', method, args);
+    if (method === 'redraw') {
+      try { // FIXME(remove)
+        this.redraw(args);
+      } catch (err) {
+        console.error(err);
       }
+    }
+    else if (method === 'autocmd') {
+      const [eventName, [bufferNumbder, line, column]] = args
+      console.warn(chalk.bold.red('Unhandled autocmd: '), args);
+    }
+    else if (method === 'command') {
+      const [[cmdName, ...cmdArgs]] = args
+      console.warn(chalk.bold.red('Command: '), args);
+      this.handleCommand(cmdName, cmdArgs)
+    }
+    else {
+      // User defined notifications are passed here.
+      console.log('Unknown method', { method, args });
+      process.exit(0)
+    }
   }
 
   onDisconnect() {
@@ -88,6 +107,23 @@ class Application extends EventEmitter {
       })
   }
 
+  handleCommand(name, args) {
+    const d = this.store.dispatcher;
+
+    switch (name) {
+      case 'FileFinder': {
+        if (this.store.finder.open)
+          d.dispatch(Command.fileFinderClose())
+        else
+          d.dispatch(Command.fileFinderOpen())
+        break
+      }
+      default: {
+        console.warn(chalk.bold.red('Unhandled command: '), name, args);
+      }
+    }
+  }
+
   redraw(events) {
     const d = this.store.dispatcher;
 
@@ -101,11 +137,11 @@ class Application extends EventEmitter {
           case 'put':
               e.shift();
               if (e.length !== 0) {
-                  d.dispatch(Action.putText(e));
+                  d.dispatch(UI.putText(e));
               }
               break;
           case 'cursor_goto':
-              d.dispatch(Action.cursor(args[0], args[1]));
+              d.dispatch(UI.cursor(args[0], args[1]));
               break;
           case 'highlight_set':
               e.shift();
@@ -118,20 +154,20 @@ class Application extends EventEmitter {
 
               const merged_highlight = Object.assign.apply(Object, highlights);
 
-              d.dispatch(Action.highlight(merged_highlight));
+              d.dispatch(UI.highlight(merged_highlight));
               break;
           case 'clear':
-              d.dispatch(Action.clearAll());
+              d.dispatch(UI.clearAll());
               break;
           case 'eol_clear':
-              d.dispatch(Action.clearEndOfLine());
+              d.dispatch(UI.clearEndOfLine());
               break;
           case 'scroll':
-              d.dispatch(Action.scrollScreen(args[0]));
+              d.dispatch(UI.scrollScreen(args[0]));
               break;
           case 'set_scroll_region':
               d.dispatch(
-                  Action.setScrollRegion({
+                  UI.setScrollRegion({
                       top:    args[0],
                       bottom: args[1],
                       left:   args[2],
@@ -140,16 +176,16 @@ class Application extends EventEmitter {
               );
               break;
           case 'resize':
-              d.dispatch(Action.resize(args[1], args[0]));
+              d.dispatch(UI.resize(args[1], args[0]));
               break;
           case 'update_fg':
-              d.dispatch(Action.updateForeground(args[0]));
+              d.dispatch(UI.updateForeground(args[0]));
               break;
           case 'update_bg':
-              d.dispatch(Action.updateBackground(args[0]));
+              d.dispatch(UI.updateBackground(args[0]));
               break;
           case 'update_sp':
-              d.dispatch(Action.updateSpecialColor(args[0]));
+              d.dispatch(UI.updateSpecialColor(args[0]));
               break;
           case 'mode_info_set':
               // Note:
@@ -158,7 +194,7 @@ class Application extends EventEmitter {
               const modeInfo = args[1];
 
               d.dispatch(
-                  Action.modeInfo(
+                  UI.modeInfo(
                       modeInfo.reduce((set, info) => {
                           set[info.name] = info;
                           return set;
@@ -167,34 +203,34 @@ class Application extends EventEmitter {
               );
               break;
           case 'mode_change':
-              d.dispatch(Action.changeMode(args[0]));
+              d.dispatch(UI.changeMode(args[0]));
               break;
           case 'busy_start':
-              d.dispatch(Action.startBusy());
+              d.dispatch(UI.startBusy());
               break;
           case 'busy_stop':
-              d.dispatch(Action.stopBusy());
+              d.dispatch(UI.stopBusy());
               break;
           case 'mouse_on':
-              d.dispatch(Action.enableMouse());
+              d.dispatch(UI.enableMouse());
               break;
           case 'mouse_off':
-              d.dispatch(Action.disableMouse());
+              d.dispatch(UI.disableMouse());
               break;
           case 'bell':
-              d.dispatch(Action.bell(false));
+              d.dispatch(UI.bell(false));
               break;
           case 'visual_bell':
-              d.dispatch(Action.bell(true));
+              d.dispatch(UI.bell(true));
               break;
           case 'set_title':
-              d.dispatch(Action.setTitle(args[0]));
+              d.dispatch(UI.setTitle(args[0]));
               break;
           case 'set_icon':
-              d.dispatch(Action.setIcon(args[0]));
+              d.dispatch(UI.setIcon(args[0]));
               break;
           case 'flush':
-              d.dispatch(Action.flush());
+              d.dispatch(UI.flush());
               break;
           default:
               console.warn(chalk.bold.red('Unhandled event: ') + name, args);

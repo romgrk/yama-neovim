@@ -4,15 +4,15 @@
 
 const { EventEmitter } = require('events')
 const { Dispatcher } = require('flux')
-const { Kind } = require('./actions')
+
+const UI = require('./actions/ui.js')
+const COMMAND = require('./actions/command.js')
+
 // const log = require('../log')
 const ScreenDrag = require('./screen-drag')
 // const ScreenWheel = require('./screen-wheel')
 const { Screen, Line } = require('./models.js')
 
-// TODO:
-// Debug log should be implemented subscriber of store
-// and be controlled by registering it or not, watching NODE_ENV variable.
 /* export interface Size {
  *     lines: number;
  *     cols: number;
@@ -113,6 +113,10 @@ module.exports = class NeovimStore extends EventEmitter {
         this.cursor_blink_interval = 1000
         this.dispatchToken = this.dispatcher.register(this.receiveAction.bind(this))
         this.screen = new Screen(0, 0)
+
+        this.finder = {
+            open: true,
+        }
     }
 
     dispatch(action) {
@@ -121,18 +125,18 @@ module.exports = class NeovimStore extends EventEmitter {
 
     receiveAction(action) {
         switch (action.type) {
-            case Kind.Input: {
+            case UI.INPUT: {
                 this.emit('input', action.input);
                 break;
             }
-            case Kind.PutText: {
+            case UI.PUT_TEXT: {
                 this.screen.put(this.cursor, { text: action.text.join(''), attr: copy(this.fontAttributes) })
                 this.cursor.col = this.cursor.col + action.text.length
                 this.emit('put', action.text)
                 this.emit('cursor')
                 break;
             }
-            case Kind.Cursor: {
+            case UI.CURSOR: {
                 this.cursor = {
                     line: action.line,
                     col: action.col,
@@ -140,7 +144,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 this.emit('cursor');
                 break;
             }
-            case Kind.Highlight: {
+            case UI.HIGHLIGHT: {
                 const hl = action.highlight;
                 this.fontAttributes.fg = colorToString(hl.foreground, this.foregroundColor);
                 this.fontAttributes.bg = colorToString(hl.background, this.backgroundColor);
@@ -153,18 +157,18 @@ module.exports = class NeovimStore extends EventEmitter {
                 // console.log('Highlight is updated: ', this.fontAttributes);
                 break;
             }
-            case Kind.FocusChanged: {
+            case UI.FOCUS_CHANGED: {
                 this.focused = action.focused;
                 this.emit('focus-changed');
                 console.log('Focus changed: ', this.focused);
                 break;
             }
-            case Kind.ClearEOL: {
+            case UI.CLEAR_EOL: {
                 this.screen.clearLine(this.cursor.line, this.cursor.col)
                 this.emit('clear-eol');
                 break;
             }
-            case Kind.ClearAll: {
+            case UI.CLEAR_ALL: {
                 this.screen.clearAll(this.cursor.line)
                 this.emit('clear-all');
                 this.cursor = {
@@ -174,61 +178,61 @@ module.exports = class NeovimStore extends EventEmitter {
                 this.emit('cursor');
                 break;
             }
-            case Kind.ScrollScreen: {
+            case UI.SCROLL_SCREEN: {
                 this.screen.scroll(this.scrollRegion, action.count)
                 this.emit('screen-scrolled', action.count);
                 break;
             }
-            case Kind.SetScrollRegion: {
+            case UI.SET_SCROLL_REGION: {
                 this.scrollRegion = action.region;
                 this.emit('scroll-region-updated');
                 break;
             }
-            case Kind.Resize: {
+            case UI.RESIZE: {
                 if (this.resize(action.lines, action.cols)) {
                     this.emit('resize', action.lines, action.cols);
                 }
                 break;
             }
-            case Kind.UpdateFG: {
+            case UI.UPDATE_FG: {
                 this.foregroundColor = colorToString(action.color, this.fontAttributes.fg);
                 this.emit('update-fg');
                 console.log('Foreground color is updated: ', this.foregroundColor);
                 break;
             }
-            case Kind.UpdateBG: {
+            case UI.UPDATE_BG: {
                 this.backgroundColor = colorToString(action.color, this.fontAttributes.bg);
                 this.emit('update-bg');
                 console.log('Background color is updated: ', this.backgroundColor);
                 break;
             }
-            case Kind.UpdateSP: {
+            case UI.UPDATE_SP: {
                 this.specialColor = colorToString(action.color, this.foregroundColor);
                 this.emit('update-sp-color');
                 console.log('Special color is updated: ', this.specialColor);
                 break;
             }
-            case Kind.ModeInfo: {
+            case UI.MODE_INFO: {
                 this.modeInfo = action.modeInfo;
                 this.emit('mode-info', this.modeInfo);
                 break;
             }
-            case Kind.Mode: {
+            case UI.MODE: {
                 this.mode = action.mode;
                 this.emit('mode', this.mode);
                 break;
             }
-            case Kind.BusyStart: {
+            case UI.BUSY_START: {
                 this.busy = true;
                 this.emit('busy');
                 break;
             }
-            case Kind.BusyStop: {
+            case UI.BUSY_STOP: {
                 this.busy = false;
                 this.emit('busy');
                 break;
             }
-            case Kind.UpdateFontSize: {
+            case UI.UPDATE_FONT_SIZE: {
                 this.fontAttributes.draw_width = action.draw_width;
                 this.fontAttributes.draw_height = action.draw_height;
                 this.fontAttributes.width = action.width;
@@ -237,17 +241,17 @@ module.exports = class NeovimStore extends EventEmitter {
                 this.emit('font-size-changed');
                 break;
             }
-            case Kind.UpdateFontPx: {
+            case UI.UPDATE_FONT_PX: {
                 this.fontSize = action.fontSize;
                 this.emit('font-size-specified');
                 break;
             }
-            case Kind.UpdateFontFamily: {
+            case UI.UPDATE_FONT_FAMILY: {
                 this.fontFamily = action.fontFamily;
                 this.emit('font-family-specified');
                 break;
             }
-            case Kind.UpdateScreenSize: {
+            case UI.UPDATE_SCREEN_SIZE: {
                 if (this.size.width === action.width && this.size.height === action.height) {
                     break;
                 }
@@ -257,13 +261,13 @@ module.exports = class NeovimStore extends EventEmitter {
                 console.log('Screen size is updated: ', action.width, action.height);
                 break;
             }
-            case Kind.UpdateScreenBounds: {
+            case UI.UPDATE_SCREEN_BOUNDS: {
                 if (this.resize(action.lines, action.cols)) {
                     this.emit('update-screen-bounds');
                 }
                 break;
             }
-            case Kind.EnableMouse: {
+            case UI.ENABLE_MOUSE: {
                 if (!this.mouse_enabled) {
                     this.mouse_enabled = true;
                     this.emit('mouse-enabled');
@@ -271,7 +275,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 }
                 break;
             }
-            case Kind.DisableMouse: {
+            case UI.DISABLE_MOUSE: {
                 if (this.mouse_enabled) {
                     this.mouse_enabled = false;
                     this.emit('mouse-disabled');
@@ -279,7 +283,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 }
                 break;
             }
-            case Kind.DragStart: {
+            case UI.DRAG_START: {
                 if (this.mouse_enabled) {
                     this.dragging = new ScreenDrag(this);
                     this.emit('input', this.dragging.start(action.event));
@@ -289,7 +293,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 }
                 break;
             }
-            case Kind.DragUpdate: {
+            case UI.DRAG_UPDATE: {
                 if (this.mouse_enabled && this.dragging !== null) {
                     const input = this.dragging.drag(action.event);
                     if (input) {
@@ -299,7 +303,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 }
                 break;
             }
-            case Kind.DragEnd: {
+            case UI.DRAG_END: {
                 if (this.mouse_enabled && this.dragging !== null) {
                     this.emit('input', this.dragging.end(action.event));
                     this.emit('drag-ended');
@@ -307,7 +311,7 @@ module.exports = class NeovimStore extends EventEmitter {
                 }
                 break;
             }
-            case Kind.WheelScroll: {
+            case UI.WHEEL_SCROLL: {
                 if (this.mouse_enabled) {
                     const input = this.wheel_scrolling.handleEvent(action.event);
                     if (input) {
@@ -317,28 +321,28 @@ module.exports = class NeovimStore extends EventEmitter {
                 }
                 break;
             }
-            case Kind.Bell: {
+            case UI.BELL: {
                 this.emit(action.visual ? 'visual-bell' : 'beep');
                 break;
             }
-            case Kind.SetTitle: {
+            case UI.SET_TITLE: {
                 this.title = action.title;
                 this.emit('title-changed');
                 console.log('Title is set to ', this.title);
                 break;
             }
-            case Kind.SetIcon: {
+            case UI.SET_ICON: {
                 this.icon_path = action.icon_path;
                 this.emit('icon-changed');
                 console.log('Icon is set to ', this.icon_path);
                 break;
             }
-            case Kind.Flush: {
+            case UI.FLUSH: {
                 this.emit('flush');
                 break;
             }
 
-            case Kind.UpdateLineHeight: {
+            case UI.UPDATE_LINE_HEIGHT: {
                 if (this.lineHeight !== action.lineHeight) {
                     this.lineHeight = action.lineHeight;
                     this.emit('line-height-changed');
@@ -346,14 +350,26 @@ module.exports = class NeovimStore extends EventEmitter {
                 }
                 break;
             }
-            case Kind.CompositionStart: {
+            case UI.COMPOSITION_START: {
                 this.emit('composition-started');
                 break;
             }
-            case Kind.CompositionEnd: {
+            case UI.COMPOSITION_END: {
                 this.emit('composition-ended');
                 break;
             }
+
+            case COMMAND.FILE_FINDER.OPEN: {
+                this.finder.open = true
+                this.emit(COMMAND.FILE_FINDER.OPEN)
+                break
+            }
+            case COMMAND.FILE_FINDER.CLOSE: {
+                this.finder.open = false
+                this.emit(COMMAND.FILE_FINDER.CLOSE)
+                break
+            }
+
             default: {
                 console.warn('Unhandled action: ', action);
                 break;

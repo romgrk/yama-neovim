@@ -13,7 +13,7 @@ const Cairo = gi.require('cairo')
 const Pango = gi.require('Pango')
 const PangoCairo = gi.require('PangoCairo')
 
-const Actions = require('./actions.js')
+const COMMAND = require('./actions/command.js')
 const Font = require('./helpers/font.js')
 
 const Screen = require('./components/Screen.js')
@@ -45,6 +45,7 @@ class Window extends EventEmitter {
     this.hbox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL })
 
     this.finder = new Finder()
+    this.finder.hide()
 
 
     /*
@@ -61,6 +62,7 @@ class Window extends EventEmitter {
     const mainContainer = this.hbox
 
     this.overlay.add(mainContainer)
+    this.overlay.addOverlay(this.finder.element)
 
     // configure main window
     this.element.setDefaultSize(600, 300)
@@ -71,14 +73,18 @@ class Window extends EventEmitter {
      * Event handlers
      */
 
-    this.application.on('start', () => {
-      this.tryResize()
-    })
-
     this.element.on('show', () => Gtk.main())
     this.element.on('destroy', () => this.quit())
     this.element.on('delete-event', () => false)
     this.element.on('configure-event', debounce(() => this.tryResize(), 200))
+
+
+    this.application.on('start', () => {
+      this.tryResize()
+    })
+
+    this.store.on(COMMAND.FILE_FINDER.OPEN, () => { this.finder.show() })
+    this.store.on(COMMAND.FILE_FINDER.CLOSE, () => { this.finder.hide() })
   }
 
   tryResize() {

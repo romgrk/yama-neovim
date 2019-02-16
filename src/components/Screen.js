@@ -13,7 +13,6 @@ const Cairo = gi.require('cairo')
 const Pango = gi.require('Pango')
 const PangoCairo = gi.require('PangoCairo')
 
-const Actions = require('../actions.js')
 const KeyEvent = require('../helpers/key-event.js')
 const Font = require('../helpers/font.js')
 
@@ -34,8 +33,6 @@ module.exports = class Screen extends EventEmitter {
 
     this.totalWidth  = 200
     this.totalHeight = 300
-
-    this.updateDimensions(this.store.size.lines, this.store.size.cols)
 
     /*
      * Build UI
@@ -74,9 +71,15 @@ module.exports = class Screen extends EventEmitter {
     this.totalWidth  = this.font.cellWidth  * cols
     this.totalHeight = this.font.cellHeight * lines
 
-    this.cairoSurface = new Cairo.ImageSurface(Cairo.Format.RGB24,
-                                                    this.totalWidth,
-                                                    this.totalHeight)
+    const gdkWindow = this.drawingArea.getWindow()
+    this.cairoSurface = gdkWindow.createSimilarSurface(
+                                        Cairo.Content.COLOR,
+                                        this.totalWidth,
+                                        this.totalHeight)
+
+    console.log('this.cairoSurface:', this.cairoSurface)
+    console.log('this.cairoSurface:', gi.System.addressOf(this.cairoSurface))
+
     this.cairoContext = new Cairo.Context(this.cairoSurface)
     this.pangoLayout = PangoCairo.createLayout(this.cairoContext)
     this.pangoLayout.setAlignment(Pango.Alignment.LEFT)
@@ -88,22 +91,13 @@ module.exports = class Screen extends EventEmitter {
     if (this.blinkInterval)
       clearInterval(this.blinkInterval)
     this.blinkInterval = setInterval(this.blink, 600)
+    this.blinkInterval.unref()
     this.blinkValue = true
   }
 
   blink() {
     this.blinkValue = !this.blinkValue
     this.drawingArea.queueDraw()
-  }
-
-  show() {
-    this.window.showAll()
-  }
-
-  quit() {
-    clearInterval(this.blinkInterval)
-    Gtk.mainQuit()
-    this.emit('quit')
   }
 
   getPosition(line, col) {
@@ -305,6 +299,10 @@ module.exports = class Screen extends EventEmitter {
     setContextColorFromHex(context, colorToHex(this.store.backgroundColor))
     context.rectangle(0, 0, allocatedWidth, allocatedHeight)
     context.fill()
+
+    /* Surface not ready yet */
+    if (this.cairoSurface === undefined)
+      return
 
     /* Draw tokens */
     this.cairoSurface.flush()
