@@ -156,10 +156,10 @@ exports.modeInfo = function modeInfo(info) {
     };
 }
 
-exports.changeMode = function changeMode(MODE) {
+exports.changeMode = function changeMode(mode) {
     return {
         type: MODE,
-        MODE,
+        mode,
     };
 }
 
