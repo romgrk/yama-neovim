@@ -59,7 +59,9 @@ module.exports = class Screen extends Gtk.DrawingArea {
   onDraw = (context) => {
 
     const grid = this.grid
-    const isActive = this.grid.id === this.store.currentGrid
+    const isActive =
+      this.grid.id === this.store.currentGrid
+      && !this.store.mode.includes('cmdline')
 
     // const mode = this.store.mode
     // const {fontFamily, fontSize, lineHeight} = this.store

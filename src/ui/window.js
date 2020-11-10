@@ -115,8 +115,9 @@ class Window extends Gtk.Window {
     const {cellWidth, cellHeight} = this.store.font
     const width  = this.gridContainer.getAllocatedWidth()
     const height = this.gridContainer.getAllocatedHeight()
-    const rows = Math.floor(height / cellHeight)
-    const cols = Math.floor(width / cellWidth)
+    const rows = Math.round(height / cellHeight)
+    const cols = Math.round(width / cellWidth)
+    // debugger
 
     this.store.dispatch({
       type: 'update-dimensions',

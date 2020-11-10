@@ -162,7 +162,7 @@ module.exports = class NeovimStore extends EventEmitter {
       const allArgs = e.slice(1)
 
       // console.log(name, allArgs)
-      console.log(name)
+      // console.log(name, args)
 
       switch (name) {
         case 'default_colors_set': {
