@@ -1,24 +1,9 @@
 /*
- * Screen.js
+ * screen-old.js
  */
 
 
-const EventEmitter = require('events')
-const colornames = require('colornames')
-const debounce = require('debounce')
-const gi = require('node-gtk')
-const Gtk = gi.require('Gtk', '3.0')
-const Gdk = gi.require('Gdk', '3.0')
-const Cairo = gi.require('cairo')
-const Pango = gi.require('Pango')
-const PangoCairo = gi.require('PangoCairo')
-
-const KeyEvent = require('../helpers/key-event.js')
-const Font = require('../helpers/font.js')
-
-const EMPTY_OBJECT = {}
-
-module.exports = class Screen extends EventEmitter {
+class Screen extends EventEmitter {
   constructor(store) {
     super()
 
@@ -380,71 +365,4 @@ module.exports = class Screen extends EventEmitter {
 
     return true
   }
-}
-
-
-
-/*
- * Helpers
- */
-
-function renderText(style, text) {
-  let result = '<span '
-  for (let key in style) {
-    const value = style[key]
-    switch (key) {
-      case 'foreground': result += `foreground="${colorToHex(value)}" `; break
-      case 'background': result += `background="${colorToHex(value)}" `; break
-      case 'fontWeight': result += `weight="${value}" `; break
-      case 'fontFamily': result += `font_family="${value}" `; break
-      case 'size': result += `size="${value}" `; break
-      case 'style': result += `style="${value}" `; break
-    }
-  }
-  result += `>${escapeMarkup(text)}</span>`
-  return result
-}
-
-function escapeMarkup(text) {
-  return text.replace(/<|>|&/g, m => {
-    switch (m) {
-      case '<': return '&lt;'
-      case '>': return '&gt;'
-      case '&': return '&amp;'
-    }
-    return m
-  })
-}
-
-function colorToHex(color) {
-  if (color.charAt(0) === '#')
-    return color
-  return colornames(color)
-}
-
-function gdkColorToHex(color) {
-  return (
-    '#'
-    + (color.red   * 255).toFixed(0).toString(16)
-    + (color.green * 255).toFixed(0).toString(16)
-    + (color.blue  * 255).toFixed(0).toString(16)
-  )
-}
-
-function setContextColorFromHex(context, hex) {
-  const r = parseInt(hex.slice(1, 3), 16) / 255
-  const g = parseInt(hex.slice(3, 5), 16) / 255
-  const b = parseInt(hex.slice(5, 7), 16) / 255
-  context.setSourceRgb(r, g, b)
-}
-
-function escapeMarkup(text) {
-  return text.replace(/<|>|&/g, m => {
-    switch (m) {
-      case '<': return '&lt;'
-      case '>': return '&gt;'
-      case '&': return '&amp;'
-    }
-    return m
-  })
 }

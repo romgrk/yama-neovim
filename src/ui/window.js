@@ -13,10 +13,10 @@ const Cairo = gi.require('cairo')
 const Pango = gi.require('Pango')
 const PangoCairo = gi.require('PangoCairo')
 
-const COMMAND = require('./actions/command.js')
-const Font = require('./helpers/font.js')
+const COMMAND = require('../actions/command.js')
+const Font = require('../helpers/font.js')
 
-const Screen = require('./components/Screen.js')
+const Screen = require('./screen.js')
 // const Finder = require('./components/Finder.js')
 
 class Window extends EventEmitter {
@@ -35,11 +35,13 @@ class Window extends EventEmitter {
       type : Gtk.WindowType.TOPLEVEL
     })
 
-    // Overlay container
-    this.overlay = new Gtk.Overlay()
+    /* this.textContainer = new Gtk.ScrolledWindow()
+     * this.textView = new Gtk.TextView()
+     * this.textView.monospace = true
+     * this.textContainer.add(this.textView) */
 
     // Screen
-    this.screen = new Screen(store)
+    this.gridContainer = new Gtk.Overlay()
 
     // horizontal and vertical boxes
     this.hbox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL })
@@ -47,27 +49,26 @@ class Window extends EventEmitter {
     // this.finder = new Finder()
     // this.finder.hide()
 
-
     /*
      * Build our layout
      */
 
-    // Gtk.Box.prototype
-    //  .packStart(children: Gtk.Widget, expand: boolean, fill: boolean, padding: number): void
-
     // pack vertically top bar (this.hbox) and scrollable window
     // this.hbox.packStart(this.scrollWindow, true, true, 0)
-    this.hbox.packStart(this.screen.element,  true, true, 0)
+    // this.hbox.packStart(this.screen.element,  true, true, 0)
+    // this.hbox.packStart(this.textContainer,  true, true, 0)
+    this.hbox.packStart(this.gridContainer,  true, true, 0)
 
-    const mainContainer = this.hbox
 
-    this.overlay.add(mainContainer)
+    // const mainContainer = this.hbox
+
+    // this.overlay.add(mainContainer)
     // this.overlay.addOverlay(this.finder.element)
 
     // configure main window
-    this.element.setDefaultSize(1000, 800)
+    this.element.setDefaultSize(800, 800)
     this.element.setResizable(true)
-    this.element.add(this.overlay)
+    this.element.add(this.hbox)
 
     /*
      * Event handlers
@@ -83,11 +84,26 @@ class Window extends EventEmitter {
       this.tryResize()
     })
 
+    this.store.on('grid-created', grid => {
+      const screen = new Screen(store, grid)
+      this.gridContainer.addOverlay(screen)
+      this.gridContainer.showAll()
+    })
+    this.gridContainer.on('get-child-position', (screen, rectangle) => {
+      const grid = screen.grid
+      const font = this.store.font
+      rectangle.x = grid.position.col * font.cellWidth
+      rectangle.y = grid.position.row * font.cellHeight
+      rectangle.width  = grid.width * font.cellHeight
+      rectangle.height = grid.height * font.cellHeight
+      return true
+    })
     // this.store.on(COMMAND.FILE_FINDER.OPEN, () => { this.finder.show() })
     // this.store.on(COMMAND.FILE_FINDER.CLOSE, () => { this.finder.hide() })
   }
 
   tryResize() {
+    return
     const {cellWidth, cellHeight} = Font.parse(`${this.store.fontFamily} ${this.store.fontSize}px`)
     const width  = this.screen.element.getAllocatedWidth()
     const height = this.screen.element.getAllocatedHeight()

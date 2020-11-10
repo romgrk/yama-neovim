@@ -16,10 +16,10 @@ gi.startLoop()
 Gtk.init([])
 Gdk.init([])
 
-const Application = require('./application.js')
-const Window = require('./window.js')
-const Store = require('./store.js')
 const KeyEvent = require('./helpers/key-event.js')
+const Application = require('./application.js')
+const Store = require('./store.js')
+const Window = require('./ui/window.js')
 
 const store = new Store()
 const app = new Application(store)
@@ -33,12 +33,16 @@ global.window = window
 /* eslint-enable no-undef */
 // </for development>
 
-window.screen.on('key-press', (event, original) => {
+window.element.canFocus = true
+window.element.addEvents(Gdk.EventMask.ALL_EVENTS_MASK)
+window.element.on('key-press-event', (gdkEvent) => {
+  const event = KeyEvent.fromGdk(gdkEvent)
   const input = KeyEvent.getVimInput(event)
   const shouldFilter = KeyEvent.shouldFilter(event)
   console.log('KeyPress', { input, shouldFilter })
   if (!shouldFilter)
     app.client.input(input)
+  return true
 })
 
 window.on('quit', () => {
@@ -56,7 +60,7 @@ app.start(
     '--embed',
     '--cmd', 'source ' + path.join(Application.getRuntimeDirectory(), 'init.vim'),
     '-u', 'NONE',
-    'src/components/Screen.js'
+    __filename,
   ],
   20,
   50
