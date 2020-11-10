@@ -10,6 +10,8 @@ const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
 const Gdk = gi.require('Gdk', '3.0')
 
+require('./helpers/cairo-prototype-extend.js')
+
 gi.startLoop()
 Gtk.init([])
 Gdk.init([])
@@ -34,9 +36,7 @@ global.window = window
 window.screen.on('key-press', (event, original) => {
   const input = KeyEvent.getVimInput(event)
   const shouldFilter = KeyEvent.shouldFilter(event)
-
   console.log('KeyPress', { input, shouldFilter })
-
   if (!shouldFilter)
     app.client.input(input)
 })
@@ -54,11 +54,9 @@ app.start(
   'nvim',
   [
     '--embed',
-    '--headless',
-    '--cmd', 'set termguicolors',
     '--cmd', 'source ' + path.join(Application.getRuntimeDirectory(), 'init.vim'),
-    '-u', 'NORC',
-    './test.txt'
+    '-u', 'NONE',
+    'src/components/Screen.js'
   ],
   20,
   50

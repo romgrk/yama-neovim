@@ -150,7 +150,8 @@ module.exports = class Screen extends EventEmitter {
   drawText(line, col, token, context) {
 
     // console.log(token)
-    this.pangoLayout.setMarkup(`<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
+    this.pangoLayout.setMarkup(
+      `<span ${this.getPangoAttributes(token.attr || {})}>${escapeMarkup(token.text)}</span>`)
 
     const {width} = this.pangoLayout.getPixelExtents()[1]
     const calculatedWidth = this.font.cellWidth * token.text.length
@@ -386,6 +387,34 @@ module.exports = class Screen extends EventEmitter {
 /*
  * Helpers
  */
+
+function renderText(style, text) {
+  let result = '<span '
+  for (let key in style) {
+    const value = style[key]
+    switch (key) {
+      case 'foreground': result += `foreground="${colorToHex(value)}" `; break
+      case 'background': result += `background="${colorToHex(value)}" `; break
+      case 'fontWeight': result += `weight="${value}" `; break
+      case 'fontFamily': result += `font_family="${value}" `; break
+      case 'size': result += `size="${value}" `; break
+      case 'style': result += `style="${value}" `; break
+    }
+  }
+  result += `>${escapeMarkup(text)}</span>`
+  return result
+}
+
+function escapeMarkup(text) {
+  return text.replace(/<|>|&/g, m => {
+    switch (m) {
+      case '<': return '&lt;'
+      case '>': return '&gt;'
+      case '&': return '&amp;'
+    }
+    return m
+  })
+}
 
 function colorToHex(color) {
   if (color.charAt(0) === '#')

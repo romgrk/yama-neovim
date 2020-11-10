@@ -76,9 +76,9 @@ module.exports = class NeovimStore extends EventEmitter {
             line: 0,
             col: 0,
         }
-        this.fontFamily = 'Fira Code Retina'
-        this.fontSize = 12
-        this.lineHeight = 16
+        this.fontFamily = 'SauceCodePro Nerd Font'
+        this.fontSize = 18
+        this.lineHeight = 22
         this.fontAttributes = {
             fg: 'white',
             bg: 'black',

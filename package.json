@@ -25,7 +25,7 @@
     "flux": "^3.1.3",
     "jest": "^23.6.0",
     "lodash.isequal": "4.5.0",
-    "node-gtk": "^0.2.2",
+    "node-gtk": "^0.5.0",
     "promised-neovim-client": "^2.0.2"
   }
 }

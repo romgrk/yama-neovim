@@ -19,7 +19,6 @@ class Application extends EventEmitter {
     return path.join(__dirname, '../runtime/')
   }
 
-
   constructor(store) {
     super()
     this.store = store
@@ -27,8 +26,6 @@ class Application extends EventEmitter {
 
   start(command, argv, lines, columns) {
     let err
-
-    argv.unshift('--embed')
 
     this.neovim_process = child_process.spawn(
       command,

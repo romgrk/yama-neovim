@@ -17,7 +17,7 @@ const COMMAND = require('./actions/command.js')
 const Font = require('./helpers/font.js')
 
 const Screen = require('./components/Screen.js')
-const Finder = require('./components/Finder.js')
+// const Finder = require('./components/Finder.js')
 
 class Window extends EventEmitter {
   constructor(store, application) {
@@ -44,8 +44,8 @@ class Window extends EventEmitter {
     // horizontal and vertical boxes
     this.hbox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL })
 
-    this.finder = new Finder()
-    this.finder.hide()
+    // this.finder = new Finder()
+    // this.finder.hide()
 
 
     /*
@@ -62,10 +62,10 @@ class Window extends EventEmitter {
     const mainContainer = this.hbox
 
     this.overlay.add(mainContainer)
-    this.overlay.addOverlay(this.finder.element)
+    // this.overlay.addOverlay(this.finder.element)
 
     // configure main window
-    this.element.setDefaultSize(600, 300)
+    this.element.setDefaultSize(1000, 800)
     this.element.setResizable(true)
     this.element.add(this.overlay)
 
@@ -83,8 +83,8 @@ class Window extends EventEmitter {
       this.tryResize()
     })
 
-    this.store.on(COMMAND.FILE_FINDER.OPEN, () => { this.finder.show() })
-    this.store.on(COMMAND.FILE_FINDER.CLOSE, () => { this.finder.hide() })
+    // this.store.on(COMMAND.FILE_FINDER.OPEN, () => { this.finder.show() })
+    // this.store.on(COMMAND.FILE_FINDER.CLOSE, () => { this.finder.hide() })
   }
 
   tryResize() {

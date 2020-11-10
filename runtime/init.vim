@@ -54,3 +54,7 @@ augroup GUIEventListeners
     " autocmd! CursorMovedI * :call GUI_notifyAutocmd('CursorMovedI')
 augroup END
 
+" Settings
+
+set termguicolors
+set number
