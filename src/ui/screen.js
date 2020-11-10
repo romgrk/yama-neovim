@@ -175,26 +175,24 @@ module.exports = class Screen extends Gtk.DrawingArea {
 
   drawCursor(context) {
     const focused = this.store.focused
-    const mode = this.store.mode
+    // const mode = this.store.mode
+    const modeInfo = this.store.modeInfo[this.store.modeIndex]
 
     setContextColorFromHex(context, this.store.cursorColor)
 
-    /* if (blink && !this.blinkValue)
-     *   return */
+    // if (blink && !this.blinkValue)
+      // return 
 
     if (!focused) {
       this.drawCursorBlockOutline(context)
     }
-    else if (mode === 'insert' || mode === 'cmdline_normal') {
-      this.drawCursorI(context)
+    else if (modeInfo.cursor_shape === 'vertical') {
+      this.drawCursorBeam(context)
     }
-    else if (mode === 'normal') {
+    else if (modeInfo.cursor_shape === 'block') {
       this.drawCursorBlock(context)
     }
-    else if (mode === 'visual') {
-      this.drawCursorBlock(context)
-    }
-    else if (mode === 'replace' || mode === 'operator') {
+    else if (modeInfo.cursor_shape === 'horizontal') {
       this.drawCursorUnderline(context)
     }
     else {
@@ -206,22 +204,22 @@ module.exports = class Screen extends Gtk.DrawingArea {
     const cursor = this.store.cursor
 
     context.rectangle(
-      cursor.col * this.font.cellWidth,
-      (cursor.row + 1) * this.font.cellHeight - this.store.cursorThickness,
-      this.font.cellWidth,
+       cursor.col * this.store.font.cellWidth,
+      (cursor.row + 1) * this.store.font.cellHeight - this.store.cursorThickness,
+      this.store.font.cellWidth,
       this.store.cursorThickness
     )
     context.fill()
   }
 
-  drawCursorI(context) {
+  drawCursorBeam(context) {
     const cursor = this.store.cursor
 
     context.rectangle(
-      cursor.col * this.font.cellWidth,
-      cursor.row * this.font.cellHeight,
+      cursor.col * this.store.font.cellWidth,
+      cursor.row * this.store.font.cellHeight,
       this.store.cursorThickness,
-      this.font.cellHeight
+      this.store.font.cellHeight
     )
     context.fill()
   }
@@ -246,10 +244,10 @@ module.exports = class Screen extends Gtk.DrawingArea {
     const cursor = this.store.cursor
 
     context.rectangle(
-      cursor.col * this.font.cellWidth,
-      cursor.row * this.font.cellHeight,
-      this.font.cellWidth,
-      this.font.cellHeight
+      cursor.col * this.store.font.cellWidth,
+      cursor.row * this.store.font.cellHeight,
+      this.store.font.cellWidth,
+      this.store.font.cellHeight
     )
     context.stoke()
   }

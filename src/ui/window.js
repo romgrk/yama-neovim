@@ -79,10 +79,12 @@ class Window extends EventEmitter {
     this.element.on('delete-event', () => false)
     this.element.on('configure-event', debounce(() => this.tryResize(), 200))
 
-
-    this.application.on('start', () => {
+    this.gridContainer.on('realize', () => {
       this.tryResize()
     })
+    // this.application.on('start', () => {
+    //   this.tryResize()
+    // })
 
     this.store.on('grid-created', grid => {
       const screen = new Screen(store, grid)
@@ -103,14 +105,18 @@ class Window extends EventEmitter {
   }
 
   tryResize() {
-    return
-    const {cellWidth, cellHeight} = Font.parse(`${this.store.fontFamily} ${this.store.fontSize}px`)
-    const width  = this.screen.element.getAllocatedWidth()
-    const height = this.screen.element.getAllocatedHeight()
-    const lines = Math.floor(height / cellHeight)
-    const cols  = Math.floor(width / cellWidth)
+    const {cellWidth, cellHeight} = this.store.font
+    const width  = this.gridContainer.getAllocatedWidth()
+    const height = this.gridContainer.getAllocatedHeight()
+    const rows = Math.floor(height / cellHeight)
+    const cols = Math.floor(width / cellWidth)
 
-    this.application.client.uiTryResize(cols, lines)
+    this.store.dispatch({
+      type: 'update-dimensions',
+      payload: {
+        width, height, cols, rows
+      }
+    })
   }
 
   show() {

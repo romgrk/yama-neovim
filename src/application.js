@@ -43,27 +43,27 @@ class Application extends EventEmitter {
       return Promise.reject(err || new Error('Failed to spawn process: ' + this.command));
     }
 
-    const nvim = await attach({ proc: this.neovim_process })
-
-    this.client = nvim
-
-    nvim.on('request', this.onRequested.bind(this))
-    nvim.on('notification', this.onNotified.bind(this))
-    nvim.on('disconnect', this.onDisconnect.bind(this)) 
-    nvim.uiAttach(columns, lines, {
+    this.client = await attach({ proc: this.neovim_process })
+    this.client.on('request', this.onRequested.bind(this))
+    this.client.on('notification', this.onNotified.bind(this))
+    this.client.on('disconnect', this.onDisconnect.bind(this)) 
+    this.client.uiAttach(columns, lines, {
       rgb: true,
       override: true,
       ext_hlstate: true,
       ext_linegrid: true,
       ext_multigrid: true,
     })
+    this.client.uiTryResize(this.store.dimensions.cols, this.store.dimensions.rows)
     this.started = true
 
     console.log(`nvim attached: ${this.neovim_process.pid} ${lines}x${columns} ${JSON.stringify(argv)}`)
 
-    // this.store.on('update-screen-bounds', () => nvim.uiTryResize(this.store.size.cols, this.store.size.lines))
+    this.store.on('update-dimensions', ({ cols, rows }) =>
+      this.client.uiTryResize(cols, rows))
+
     // Note: Neovim frontend has responsiblity to emit 'GUIEnter' on initialization
-    // this.client.command('doautocmd <nomodeline> GUIEnter', true)
+    this.client.command('doautocmd <nomodeline> GUIEnter', true)
 
     this.emit('start')
   }

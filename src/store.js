@@ -66,67 +66,68 @@ module.exports = class NeovimStore extends EventEmitter {
     */
 
   constructor() {
-      super()
-      this.dispatcher = new Dispatcher()
-      this.size = {
-          lines: 0,
-          cols: 0,
-          width: 0,
-          height: 0,
-      }
-      this.fontFamily = 'monospace'
-      this.fontSize = 18
-      this.updateFont()
-      this.lineHeight = 22
-      this.foregroundColor = 'white'
-      this.backgroundColor = 'black'
-      this.specialColor = 'blue'
-      this.cursorColor = '#888888'
-      this.cursorThickness = 2
-      this.modeInfo = {}
-      this.mode = 'normal'
-      this.busy = false
-      this.mouse_enabled = true
-      this.dragging = null
-      this.title = ''
-      this.icon_path = ''
-      // this.wheel_scrolling = new ScreenWheel(this)
-      this.scrollRegion = {
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-      }
-      this.focused = true
-      this.blink_cursor = false
-      this.cursor_blink_interval = 1000
-      this.dispatchToken = this.dispatcher.register(this.receiveAction.bind(this))
+    super()
+    this.dispatcher = new Dispatcher()
+    this.dispatchToken = this.dispatcher.register(this.receiveAction.bind(this))
 
-      this.currentGrid = 1
-      this.grids = {
-        1: new Grid(1, 0, 0),
-      }
-      this.grids.get = index => {
-        if (!this.grids[index]) {
-          this.grids[index] = new Grid(index, 0, 0)
-          this.emit('grid-created', this.grids[index])
-        }
-        return this.grids[index]
-      }
-      this.cursor = {
-        row: 0,
-        col: 0,
-      }
+    this.fontFamily = 'monospace'
+    this.fontSize = 18
+    this.lineHeight = 22
+    this.updateFont()
 
-      this.hlAttributes = {}
-      this.hlAttributes.get = id => {
-        return this.hlAttributes[id] || this.hlAttributes.default
-      }
-      this.hlGroups = {}
+    this.foregroundColor = 'white'
+    this.backgroundColor = 'black'
+    this.specialColor = 'blue'
 
-      this.finder = {
-          open: true,
+    this.focused = true
+    this.blinkCursor = false
+    this.cursorBlinkInterval = 1000
+    this.cursorColor = '#599eff'
+    this.cursorThickness = 2
+
+    this.busy = false
+    this.mouse_enabled = true
+    this.dragging = null
+    this.title = ''
+    this.icon_path = ''
+
+
+    this.dimensions = {
+      rows: 24,
+      cols: 80,
+      width: 0,
+      height: 0,
+    }
+
+    this.mode = 'normal'
+    this.modeIndex = -1
+    this.modeInfo = []
+
+    this.currentGrid = 1
+    this.grids = {
+      1: new Grid(1, 0, 0),
+    }
+    this.grids.get = index => {
+      if (!this.grids[index]) {
+        this.grids[index] = new Grid(index, 0, 0)
+        this.emit('grid-created', this.grids[index])
       }
+      return this.grids[index]
+    }
+    this.cursor = {
+      row: 0,
+      col: 0,
+    }
+
+    this.hlAttributes = {}
+    this.hlAttributes.get = id => {
+      return this.hlAttributes[id] || this.hlAttributes.default
+    }
+    this.hlGroups = {}
+
+    this.finder = {
+      open: true,
+    }
   }
 
   updateFont() {
@@ -134,7 +135,7 @@ module.exports = class NeovimStore extends EventEmitter {
   }
 
   dispatch(action) {
-      this.dispatcher.dispatch(action)
+    this.dispatcher.dispatch(action)
   }
 
   receiveRedrawEvents(events) {
@@ -240,10 +241,21 @@ module.exports = class NeovimStore extends EventEmitter {
           break
         }
 
+        case 'mode_change': {
+          const [mode, modeIndex] = args
+          this.mode = mode
+          this.modeIndex = modeIndex
+          this.emit('mode-change')
+          break
+        }
+        case 'mode_info_set': {
+          const [cursorEnabled, modeInfo] = args
+          this.modeInfo = modeInfo
+          break
+        }
         case 'option_set':
         case 'mouse_off':
-        case 'mode_info_set':
-        case 'mode_change': {
+        {
           // console.warn(chalk.bold.red('Unhandled event: ') + name, args);
           break
         }
@@ -279,23 +291,17 @@ module.exports = class NeovimStore extends EventEmitter {
   }
 
   receiveAction(action) {
-      switch (action.type) {
-          case COMMAND.FILE_FINDER.OPEN: {
-              this.finder.open = true
-              this.emit(COMMAND.FILE_FINDER.OPEN)
-              break
-          }
-          case COMMAND.FILE_FINDER.CLOSE: {
-              this.finder.open = false
-              this.emit(COMMAND.FILE_FINDER.CLOSE)
-              break
-          }
-
-          default: {
-              console.warn('Unhandled action: ', action);
-              break;
-          }
+    switch (action.type) {
+      case 'update-dimensions': {
+        this.dimensions = action.payload
+        this.emit('update-dimensions', this.dimensions)
+        break
       }
+      default: {
+        console.warn('Unhandled action: ', action);
+        break;
+      }
+    }
   }
 
   resize(lines, cols) {

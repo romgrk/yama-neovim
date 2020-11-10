@@ -158,12 +158,13 @@ class Grid extends EventEmitter {
         }
         const cells = this.getLine(sourceRow).slice(left, right)
         this.setCells(destRow, left, cells)
-        if (left === 0 && right === this.width) {
-          this.ids[destRow] = this.ids[sourceRow]
-        } else {
-          debugger
-          this.ids[destRow] = getNextLineId()
-        }
+        this.ids[destRow] = getNextLineId()
+        /* if (left === 0 && right === this.width) {
+         *   this.ids[destRow] = this.ids[sourceRow]
+         * } else {
+         *   debugger
+         *   this.ids[destRow] = getNextLineId()
+         * } */
       }
     }
     else {
@@ -179,12 +180,13 @@ class Grid extends EventEmitter {
         }
         const cells = this.getLine(sourceRow).slice(left, right)
         this.setCells(destRow, left, cells)
-        if (left === 0 && right === this.width) {
-          this.ids[destRow] = this.ids[sourceRow]
-        } else {
-          debugger
-          this.ids[destRow] = getNextLineId()
-        }
+        this.ids[destRow] = getNextLineId()
+        /* if (left === 0 && right === this.width) {
+         *   this.ids[destRow] = this.ids[sourceRow]
+         * } else {
+         *   debugger
+         *   this.ids[destRow] = getNextLineId()
+         * } */
       }
     }
   }
