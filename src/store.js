@@ -178,13 +178,12 @@ module.exports = class NeovimStore extends EventEmitter {
           break
         }
         case 'hl_attr_define': {
-          const [id, attributes, _, info] = args
-          this.hlAttributes[id] = {
-            foreground: this.foregroundColor,
-            background: this.backgroundColor,
-            special: this.specialColor,
-            ...attributes,
-            info,
+          for (let i = 0; i < allArgs.length; i++) {
+            const [id, attributes, _, info] = allArgs[i]
+            this.hlAttributes[id] = {
+              ...attributes,
+              info,
+            }
           }
           break
         }
