@@ -40,6 +40,24 @@ const Grid = require('./models/grid.js')
 
 // export type DispatcherType = Dispatcher<ActionType>;
 
+const initialPopupmenu = {
+  open: false,
+  index: -1,
+  items: [],
+}
+
+const initialCmdline = {
+  open: false,
+  content: [],
+  c: undefined,
+  shift: false,
+  pos: -1,
+  firstc: '',
+  prompt: '',
+  indent: 0,
+  level: 0,
+  lines: [],
+}
 
 module.exports = class NeovimStore extends EventEmitter {
   /* dispatchToken: string;
@@ -82,8 +100,8 @@ module.exports = class NeovimStore extends EventEmitter {
     this.focused = true
     this.blinkCursor = false
     this.cursorBlinkInterval = 1000
-    this.cursorColor = '#599eff'
-    this.cursorThickness = 2
+    this.cursorColor = '#ffffff'
+    this.cursorThickness = 1
 
     this.busy = false
     this.mouse_enabled = true
@@ -91,6 +109,7 @@ module.exports = class NeovimStore extends EventEmitter {
     this.title = ''
     this.icon_path = ''
 
+    this.popupmenu = initialPopupmenu
 
     this.dimensions = {
       rows: 24,
@@ -125,9 +144,7 @@ module.exports = class NeovimStore extends EventEmitter {
     }
     this.hlGroups = {}
 
-    this.finder = {
-      open: true,
-    }
+    this.cmdline = initialCmdline
   }
 
   updateFont() {
@@ -144,7 +161,8 @@ module.exports = class NeovimStore extends EventEmitter {
       const args = e[1];
       const allArgs = e.slice(1)
 
-      console.log(name, allArgs)
+      // console.log(name, allArgs)
+      console.log(name)
 
       switch (name) {
         case 'default_colors_set': {
@@ -253,19 +271,121 @@ module.exports = class NeovimStore extends EventEmitter {
           this.modeInfo = modeInfo
           break
         }
+        case 'busy_start': {
+          this.busy = true
+          this.emit('busy-changed', this.busy)
+          break
+        }
+        case 'busy_stop': {
+          this.busy = false
+          this.emit('busy-changed', this.busy)
+          break
+        }
+        case 'set_title': {
+          const [title] = args
+          this.title = title
+          this.emit('title-changed', this.title)
+          break
+        }
+
+        case 'popupmenu_show': {
+          const [items, selected, row, col, grid] = args
+          this.popupmenu = {
+            ...this.popupmenu,
+            open: true,
+            items, selected, row, col, grid
+          }
+          this.emit('popupmenu-show', this.popupmenu)
+          break
+        }
+        case 'popupmenu_select': {
+          const [selected] = args
+          this.popupmenu = {
+            ...this.popupmenu,
+            selected,
+          }
+          this.emit('popupmenu-update', this.popupmenu)
+          break
+        }
+        case 'popupmenu_hide': {
+          this.popupmenu = { ...this.popupmenu, open: false }
+          this.emit('popupmenu-hide', this.popupmenu)
+          break
+        }
+
+        case 'cmdline_show': {
+          const [content, pos, firstc, prompt, indent, level] = args
+          this.cmdline = {
+            ...this.cmdline,
+            open: true,
+            content, pos, firstc, prompt, indent, level
+          }
+          this.emit('cmdline-show', this.cmdline)
+          break
+        }
+        case 'cmdline_hide': {
+          this.cmdline = { ...this.cmdline, open: false }
+          this.emit('cmdline-hide')
+          break
+        }
+        case 'cmdline_pos': {
+          const [pos, level] = args
+          this.cmdline = {
+            ...this.cmdline,
+            pos, level
+          }
+          this.emit('cmdline-update', this.cmdline)
+          break
+        }
+        case 'cmdline_special_char': {
+          const [c, shift, level] = args
+          this.cmdline = {
+            ...this.cmdline,
+            c, shift, level
+          }
+          this.emit('cmdline-update', this.cmdline)
+          break
+        }
+        case 'cmdline_block_show': {
+          const [lines] = args
+          this.cmdline = {
+            ...this.cmdline,
+            lines
+          }
+          this.emit('cmdline-update', this.cmdline)
+          break
+        }
+        case 'cmdline_block_append': {
+          const [line] = args
+          this.cmdline = {
+            ...this.cmdline,
+            lines: this.cmdline.lines.concat(line)
+          }
+          this.emit('cmdline-update', this.cmdline)
+          break
+        }
+        case 'cmdline_block_hide': {
+          this.cmdline = { ...this.cmdline, lines: [] }
+          this.emit('cmdline-update', this.cmdline)
+          break
+        }
+
         case 'option_set':
+        case 'mouse_on':
         case 'mouse_off':
+        case 'set_icon':
+        case 'update_menu':
+        case 'bell':
+        case 'visual_bell':
         {
           // console.warn(chalk.bold.red('Unhandled event: ') + name, args);
           break
         }
-        case 'cmdline_show':
-        case 'cmdline_hide':
-        case 'cmdline_special_char':
         case 'tabline_update':
         case 'msg_show':
         case 'msg_showmode':
         case 'msg_showcmd':
+        case 'msg_ruler':
         case 'msg_clear':
         {
           // ignore

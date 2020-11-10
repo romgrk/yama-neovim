@@ -14,37 +14,41 @@ const Pango = gi.require('Pango')
 const PangoCairo = gi.require('PangoCairo')
 
 const COMMAND = require('../actions/command.js')
+const KeyEvent = require('../helpers/key-event.js')
 const Font = require('../helpers/font.js')
 
 const Screen = require('./screen.js')
+const Cmdline = require('./cmdline.js')
 // const Finder = require('./components/Finder.js')
 
-class Window extends EventEmitter {
-  constructor(store, application) {
-    super()
+class Window extends Gtk.Window {
+  constructor(store, app) {
+    super({
+      type : Gtk.WindowType.TOPLEVEL
+    })
 
-    this.application = application
+    this.app = app
     this.store = store
 
     /*
      * Build UI
      */
 
-    // Main program window
-    this.element = new Gtk.Window({
-      type : Gtk.WindowType.TOPLEVEL
-    })
-
     /* this.textContainer = new Gtk.ScrolledWindow()
      * this.textView = new Gtk.TextView()
      * this.textView.monospace = true
      * this.textContainer.add(this.textView) */
 
-    // Screen
+    // Editors are
     this.gridContainer = new Gtk.Overlay()
+    this.gridContainer.canFocus = true
+    this.gridContainer.addEvents(Gdk.EventMask.ALL_EVENTS_MASK)
+
+    // Cmdline
+    this.cmdline = new Cmdline(store, app)
 
     // horizontal and vertical boxes
-    this.hbox = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL })
+    this.box = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL })
 
     // this.finder = new Finder()
     // this.finder.hide()
@@ -53,36 +57,38 @@ class Window extends EventEmitter {
      * Build our layout
      */
 
-    // pack vertically top bar (this.hbox) and scrollable window
-    // this.hbox.packStart(this.scrollWindow, true, true, 0)
-    // this.hbox.packStart(this.screen.element,  true, true, 0)
-    // this.hbox.packStart(this.textContainer,  true, true, 0)
-    this.hbox.packStart(this.gridContainer,  true, true, 0)
+    // pack vertically top bar (this.box) and scrollable window
+    // this.box.packStart(this.scrollWindow, true, true, 0)
+    // this.box.packStart(this.screen.element,  true, true, 0)
+    // this.box.packStart(this.textContainer,  true, true, 0)
+    this.box.packStart(this.gridContainer,  true, true, 0)
+    this.box.packEnd(this.cmdline,        false, true, 0)
 
 
-    // const mainContainer = this.hbox
+    // const mainContainer = this.box
 
     // this.overlay.add(mainContainer)
     // this.overlay.addOverlay(this.finder.element)
 
     // configure main window
-    this.element.setDefaultSize(800, 800)
-    this.element.setResizable(true)
-    this.element.add(this.hbox)
+    this.setDefaultSize(800, 800)
+    this.setResizable(true)
+    this.add(this.box)
 
     /*
      * Event handlers
      */
 
-    this.element.on('show', () => Gtk.main())
-    this.element.on('destroy', () => this.quit())
-    this.element.on('delete-event', () => false)
-    this.element.on('configure-event', debounce(() => this.tryResize(), 200))
+    this.on('show', () => Gtk.main())
+    this.on('destroy', () => this.quit())
+    this.on('delete-event', () => false)
+    this.on('configure-event', debounce(() => this.tryResize(), 200))
 
+    this.gridContainer.on('key-press-event', app.receiveKeyEvent)
     this.gridContainer.on('realize', () => {
       this.tryResize()
     })
-    // this.application.on('start', () => {
+    // this.app.on('start', () => {
     //   this.tryResize()
     // })
 
@@ -90,6 +96,9 @@ class Window extends EventEmitter {
       const screen = new Screen(store, grid)
       this.gridContainer.addOverlay(screen)
       this.gridContainer.showAll()
+      grid.on('close', () => {
+        this.gridContainer.remove(screen)
+      })
     })
     this.gridContainer.on('get-child-position', (screen, rectangle) => {
       const grid = screen.grid
@@ -100,8 +109,6 @@ class Window extends EventEmitter {
       rectangle.height = grid.height * font.cellHeight
       return true
     })
-    // this.store.on(COMMAND.FILE_FINDER.OPEN, () => { this.finder.show() })
-    // this.store.on(COMMAND.FILE_FINDER.CLOSE, () => { this.finder.hide() })
   }
 
   tryResize() {
@@ -120,13 +127,12 @@ class Window extends EventEmitter {
   }
 
   show() {
-    this.element.showAll()
+    this.showAll()
   }
 
   quit() {
     clearInterval(this.blinkInterval)
     Gtk.mainQuit()
-    this.emit('quit')
   }
 }
 

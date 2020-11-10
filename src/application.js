@@ -7,9 +7,9 @@ const path = require('path')
 const child_process = require('child_process')
 const EventEmitter = require('events')
 const chalk = require('chalk')
-// const { attach } = require('promised-neovim-client')
 const { attach } = require('neovim')
 
+const KeyEvent = require('./helpers/key-event.js')
 const UI = require('./actions/ui.js')
 const Command = require('./actions/command.js')
 
@@ -53,6 +53,7 @@ class Application extends EventEmitter {
       ext_hlstate: true,
       ext_linegrid: true,
       ext_multigrid: true,
+      ext_popupmenu: true,
     })
     this.client.uiTryResize(this.store.dimensions.cols, this.store.dimensions.rows)
     this.started = true
@@ -122,6 +123,16 @@ class Application extends EventEmitter {
         console.warn(chalk.bold.red('Unhandled command: '), name, args);
       }
     }
+  }
+
+  receiveKeyEvent = (gdkEvent) => {
+    const event = KeyEvent.fromGdk(gdkEvent)
+    const input = KeyEvent.getVimInput(event)
+    const shouldFilter = KeyEvent.shouldFilter(event)
+    console.log('KeyPress', { input, shouldFilter })
+    if (!shouldFilter)
+      this.client.input(input)
+    return true
   }
 }
 

@@ -16,7 +16,6 @@ gi.startLoop()
 Gtk.init([])
 Gdk.init([])
 
-const KeyEvent = require('./helpers/key-event.js')
 const Application = require('./application.js')
 const Store = require('./store.js')
 const Window = require('./ui/window.js')
@@ -33,19 +32,7 @@ global.window = window
 /* eslint-enable no-undef */
 // </for development>
 
-window.element.canFocus = true
-window.element.addEvents(Gdk.EventMask.ALL_EVENTS_MASK)
-window.element.on('key-press-event', (gdkEvent) => {
-  const event = KeyEvent.fromGdk(gdkEvent)
-  const input = KeyEvent.getVimInput(event)
-  const shouldFilter = KeyEvent.shouldFilter(event)
-  console.log('KeyPress', { input, shouldFilter })
-  if (!shouldFilter)
-    app.client.input(input)
-  return true
-})
-
-window.on('quit', () => {
+window.on('destroy', () => {
   app.quit()
 })
 
@@ -59,7 +46,7 @@ app.start(
   [
     '--embed',
     '--cmd', 'source ' + path.join(Application.getRuntimeDirectory(), 'init.vim'),
-    '-u', 'NONE',
+    // '-u', 'NONE',
     __filename,
   ],
   20,
