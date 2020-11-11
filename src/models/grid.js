@@ -19,12 +19,6 @@ class Grid extends EventEmitter {
     this.focusable = true
     this.external = false
     this.hidden = false
-    /* this.position = {
-     *   row: 0,
-     *   col: 0,
-     *   width: 0,
-     *   height: 0,
-     * } */
     this.viewport = {
       topline: 0,
       botline: 0,
@@ -35,9 +29,7 @@ class Grid extends EventEmitter {
     this.col = 0
     this.width  = 0
     this.height = 0
-    /* Object.defineProperty(this, 'position', {
-     *   get: () => { debugger }
-     * }) */
+
     this.buffer = []
     this.ids = []
     this.resize(width, height)

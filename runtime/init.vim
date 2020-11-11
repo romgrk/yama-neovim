@@ -52,7 +52,11 @@ augroup GUIEventListeners
     " autocmd! BufWipeout   * :call GUI_notifyAutocmd('BufWipeout')
     " autocmd! CursorMoved  * :call GUI_notifyAutocmd('CursorMoved')
     " autocmd! CursorMovedI * :call GUI_notifyAutocmd('CursorMovedI')
+    " autocmd! VimEnter    * :call GUI_notifyAutocmd('VimEnter')
+    autocmd! ColorScheme * :call GUI_notifyAutocmd('ColorScheme')
 augroup END
+
+call timer_start(100, {-> execute('doautocmd ColorScheme')})
 
 " Settings
 

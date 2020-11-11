@@ -78,8 +78,8 @@ class Application extends EventEmitter {
       this.store.receiveRedrawEvents(args);
     }
     else if (method === 'autocmd') {
-      const [eventName, [bufferNumbder, line, column]] = args
-      console.warn(chalk.bold.red('Unhandled autocmd: '), args);
+      const [eventName, autocmdArgs] = args[0]
+      this.store.receiveAutocmd(eventName, autocmdArgs)
     }
     else if (method === 'command') {
       const [[cmdName, ...cmdArgs]] = args

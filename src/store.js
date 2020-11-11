@@ -89,8 +89,8 @@ module.exports = class NeovimStore extends EventEmitter {
     this.dispatchToken = this.dispatcher.register(this.receiveAction.bind(this))
 
     this.fontFamily = 'monospace'
-    this.fontSize = 18
-    this.lineHeight = 22
+    this.fontSize = 16
+    this.lineHeight = 20
     this.updateFont()
 
     this.foregroundColor = 'white'
@@ -116,6 +116,8 @@ module.exports = class NeovimStore extends EventEmitter {
       cols: 80,
       width: 0,
       height: 0,
+      remainingWidth: 0,
+      remainingHeight: 0,
     }
 
     this.mode = 'normal'
@@ -143,6 +145,9 @@ module.exports = class NeovimStore extends EventEmitter {
       return this.hlAttributes[id] || this.hlAttributes.default
     }
     this.hlGroups = {}
+    this.hlGroups.get = name => {
+      return this.hlAttributes[this.hlGroups[name]]
+    }
 
     this.cmdline = initialCmdline
   }
@@ -410,6 +415,17 @@ module.exports = class NeovimStore extends EventEmitter {
 
     // console.log(text)
     // console.log(this.grids)
+  }
+
+  receiveAutocmd(name, args) {
+    switch (name) {
+      case 'ColorScheme': {
+        this.emit('colorscheme', args)
+        break
+      }
+      default:
+        console.warn(chalk.bold.red('Unhandled autocmd: '), name, args);
+    }
   }
 
   receiveAction(action) {

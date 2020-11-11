@@ -4,7 +4,6 @@
 
 
 const EventEmitter = require('events')
-const colornames = require('colornames')
 const debounce = require('debounce')
 const gi = require('node-gtk')
 const Gtk = gi.require('Gtk', '3.0')
@@ -13,6 +12,7 @@ const Cairo = gi.require('cairo')
 const Pango = gi.require('Pango')
 const PangoCairo = gi.require('PangoCairo')
 
+const Color = require('../helpers/color.js')
 const KeyEvent = require('../helpers/key-event.js')
 const Font = require('../helpers/font.js')
 
@@ -40,6 +40,9 @@ module.exports = class Screen extends Gtk.DrawingArea {
 
   destroy() {
     this.store.removeListener('flush', this.onFlush)
+    const parent = this.getParent()
+    if (parent)
+      parent.remove(this)
   }
 
   onHide = () => {
@@ -89,40 +92,49 @@ module.exports = class Screen extends Gtk.DrawingArea {
     // const mode = this.store.mode
     // const {fontFamily, fontSize, lineHeight} = this.store
 
-    // const allocatedWidth  = this.getAllocatedWidth()
-    // const allocatedHeight = this.getAllocatedHeight()
+    const allocatedWidth  = this.getAllocatedWidth()
+    const allocatedHeight = this.getAllocatedHeight()
 
     // context.setFontSize(fontSize)
 
-    // /* Draw background */
-    // setContextColorFromHex(context, colorToHex(this.store.backgroundColor))
-    // context.rectangle(0, 0, allocatedWidth, allocatedHeight)
-    // context.fill()
+    /* Draw background */
+    const backgroundColor = Color.toHex(this.store.hlAttributes.default.background)
+    // const backgroundColor = Color.toHex(0x993333)
+    setContextColorFromHex(context, backgroundColor)
+    context.rectangle(0, 0, allocatedWidth, allocatedHeight)
+    context.fill()
 
-    /* Surface not ready yet */
-    if (this.cairoSurface === undefined)
-      return
+    /* Draw text if surface is ready */
+    if (this.cairoSurface !== undefined) {
+      /* Redraw invalid lines */
+      for (let i = 0; i < grid.height; i++) {
+        if (this.validLineIds.has(grid.ids[i]))
+          continue
+        this.drawLine(i, this.cairoContext)
+      }
+      this.validLineIds = new Set(grid.ids)
 
-    /* Redraw invalid lines */
-    for (let i = 0; i < grid.height; i++) {
-      if (this.validLineIds.has(grid.ids[i]))
-        continue
-      this.drawLine(i, this.cairoContext)
+      /* Draw tokens */
+      this.cairoSurface.flush()
+      context.save()
+      context.rectangle(0, 0, this.totalWidth, this.totalHeight)
+      context.clip()
+      context.setSourceSurface(this.cairoSurface, 0, 0)
+      context.paint()
+      context.restore()
+
+      /* Draw cursor */
+      if (isActive && this.grid.height > 0)
+        this.drawCursor(context)
     }
-    this.validLineIds = new Set(grid.ids)
 
-    /* Draw tokens */
-    this.cairoSurface.flush()
-    context.save()
-    context.rectangle(0, 0, this.totalWidth, this.totalHeight)
-    context.clip()
-    context.setSourceSurface(this.cairoSurface, 0, 0)
-    context.paint()
-    context.restore()
-
-    /* Draw cursor */
-    if (isActive && this.grid.height > 0)
-      this.drawCursor(context)
+    /* Draw separator */
+    if (grid.col !== 0) {
+      const separatorColor = Color.toHex(this.store.hlAttributes[this.store.hlGroups.VertSplit].foreground)
+      setContextColorFromHex(context, separatorColor)
+      context.rectangle(0, 0, 1, allocatedHeight)
+      context.fill()
+    }
 
     return true
   }
@@ -257,8 +269,8 @@ module.exports = class Screen extends Gtk.DrawingArea {
     const text = char
     const attr = this.store.hlAttributes.get(hl)
 
-    const foreground = colorToHex(attr.background || this.store.backgroundColor)
-    const background = colorToHex(attr.foreground || this.store.foregroundColor)
+    const foreground = Color.toHex(attr.background || this.store.backgroundColor)
+    const background = Color.toHex(attr.foreground || this.store.foregroundColor)
 
     const cursorAttr = { foreground, background }
 
@@ -310,37 +322,20 @@ function renderText(text, style, defaults) {
   for (let key in style) {
     const value = style[key]
     switch (key) {
-      case 'foreground': result += `foreground="${colorToHex(value)}" `; didFg = true; break
-      case 'background': result += `background="${colorToHex(value)}" `; didBg = true; break
+      case 'foreground': result += `foreground="${Color.toHex(value)}" `; didFg = true; break
+      case 'background': result += `background="${Color.toHex(value)}" `; didBg = true; break
       case 'fontWeight': result += `weight="${value}" `; break
       case 'size': result += `size="${value}" `; break
       case 'style': result += `style="${value}" `; break
     }
   }
   if (!didFg)
-    result += `foreground="${colorToHex(defaults.foreground)}" `
+    result += `foreground="${Color.toHex(defaults.foreground)}" `
   if (!didBg)
-    result += `background="${colorToHex(defaults.background)}" `
+    result += `background="${Color.toHex(defaults.background)}" `
 
   result += `>${escapeMarkup(text)}</span>`
   return result
-}
-
-function colorToHex(color) {
-  if (typeof color === 'number')
-    return '#' + color.toString(16).padStart(6, '0')
-  if (color.charAt(0) === '#')
-    return color
-  return colornames(color)
-}
-
-function gdkColorToHex(color) {
-  return (
-    '#'
-    + (color.red   * 255).toFixed(0).toString(16)
-    + (color.green * 255).toFixed(0).toString(16)
-    + (color.blue  * 255).toFixed(0).toString(16)
-  )
 }
 
 function setContextColorFromHex(context, hex) {
