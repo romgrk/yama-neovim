@@ -3,12 +3,9 @@
  */
 
 const Color = require('color')
-const { toHex } = require('../helpers/color')
+const { darken, lighten, toHex } = require('../helpers/color')
 
 module.exports = generateTheme
-
-const darken  = (c, n) => Color(c).darken(n).hex()
-const lighten = (c, n) => Color(c).lighten(n).hex()
 
 const cssForTheme = colors => `
   @define-color fg_color ${colors.foreground};

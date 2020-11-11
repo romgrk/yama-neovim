@@ -2,10 +2,15 @@
  * color.js
  */
 
-const color = require('color')
+const Color = require('color')
 const colornames = require('colornames')
 
+const darken  = (c, n) => Color(c).darken(n).hex()
+const lighten = (c, n) => Color(c).lighten(n).hex()
+
 module.exports = {
+  darken,
+  lighten,
   toHex,
 }
 
