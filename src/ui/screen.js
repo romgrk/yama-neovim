@@ -264,8 +264,12 @@ module.exports = class Screen extends Gtk.DrawingArea {
 
   drawCursorBlock(context) {
     const cursor = this.store.cursor
+    const cursorIndex = cursor.col + cursor.row * this.grid.width
 
-    const [char, hl] = this.grid.getCell(cursor.row, cursor.col)
+    const [char, hl] =
+      cursorIndex < this.grid.buffer.length ?
+        this.grid.getCell(cursor.row, cursor.col) :
+        [' ', 0]
 
     const text = char
     const attr = this.store.hlAttributes.get(hl)
