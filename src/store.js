@@ -15,30 +15,6 @@ const ScreenDrag = require('./screen-drag')
 const Font = require('./helpers/font.js')
 const Grid = require('./models/grid.js')
 
-/* export interface Size {
- *     lines: number;
- *     cols: number;
- *     width: number;
- *     height: number;
- * } */
-
-/* export interface Cursor {
- *     line: number;
- *     col: number;
- * } */
-
-/* export interface FontAttributes {
- *     fg: string;
- *     bg: string;
- *     sp: string;
- *     bold: boolean;
- *     italic: boolean;
- *     underline: boolean;
- *     undercurl: boolean;
- *     reverse: boolean;
- * } */
-
-// export type DispatcherType = Dispatcher<ActionType>;
 
 const initialPopupmenu = {
   open: false,
@@ -60,35 +36,12 @@ const initialCmdline = {
 }
 
 module.exports = class NeovimStore extends EventEmitter {
-  /* dispatchToken: string;
-    *
-    * size: Size;
-    * fontAttributes: FontAttributes;
-    * foregroundColor: string;
-    * backgroundColor: string;
-    * specialColor: string;
-    * cursor: Cursor;
-    * modeInfo: ModeInfoSet;
-    * mode: string;
-    * busy: boolean;
-    * mouse_enabled: boolean;
-    * dragging: ScreenDrag;
-    * title: string;
-    * icon_path: string;
-    * wheel_scrolling: ScreenWheel;
-    * scrollRegion: Region;
-    * dispatcher: Dispatcher<ActionType>;
-    * focused: boolean;
-    * lineHeight: number;
-    * blink_cursor: boolean;
-    */
-
   constructor() {
     super()
     this.dispatcher = new Dispatcher()
     this.dispatchToken = this.dispatcher.register(this.receiveAction.bind(this))
 
-    this.fontFamily = 'monospace'
+    this.fontFamily = 'SauceCodePro Nerd Font'
     this.fontSize = 16
     this.lineHeight = 20
     this.updateFont()
@@ -168,8 +121,9 @@ module.exports = class NeovimStore extends EventEmitter {
 
       // console.log(name, allArgs)
       // console.log(name, args)
-      if (name.includes('win_'))
-        console.log(name, args)
+      // if (name.includes('win_'))
+        // console.log(name, args)
+      console.log(name)
 
       switch (name) {
         case 'default_colors_set': {
