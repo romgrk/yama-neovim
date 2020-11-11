@@ -18,8 +18,11 @@ const Grid = require('./models/grid.js')
 
 const initialPopupmenu = {
   open: false,
-  index: -1,
+  selected: -1,
   items: [],
+  grid: 0,
+  col: 0,
+  row: 0,
 }
 
 const initialCmdline = {
@@ -35,7 +38,7 @@ const initialCmdline = {
   lines: [],
 }
 
-module.exports = class NeovimStore extends EventEmitter {
+class NeovimStore extends EventEmitter {
   constructor() {
     super()
     this.dispatcher = new Dispatcher()
@@ -189,6 +192,7 @@ module.exports = class NeovimStore extends EventEmitter {
         }
         case 'win_pos': {
           const [index, win, row, col, width, height] = args
+          console.log([index, { row, col, width, height }, this.dimensions.cols])
           this.grids.get(index).setPos(win, row, col, width, height)
           break
         }
@@ -256,6 +260,7 @@ module.exports = class NeovimStore extends EventEmitter {
             open: true,
             items, selected, row, col, grid
           }
+          console.log(items)
           this.emit('popupmenu-show', this.popupmenu)
           break
         }
@@ -265,7 +270,7 @@ module.exports = class NeovimStore extends EventEmitter {
             ...this.popupmenu,
             selected,
           }
-          this.emit('popupmenu-update', this.popupmenu)
+          this.emit('popupmenu-select', this.popupmenu)
           break
         }
         case 'popupmenu_hide': {
@@ -415,6 +420,10 @@ module.exports = class NeovimStore extends EventEmitter {
     return true;
   }
 }
+
+const store = new NeovimStore()
+
+module.exports = store
 
 function copy(object) {
     return JSON.parse(JSON.stringify(object))

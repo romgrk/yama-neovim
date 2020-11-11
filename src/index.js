@@ -17,10 +17,9 @@ Gtk.init([])
 Gdk.init([])
 
 const Application = require('./application.js')
-const Store = require('./store.js')
+const store = require('./store.js')
 const Window = require('./ui/window.js')
 
-const store = new Store()
 const app = new Application(store)
 const window = new Window(store, app)
 

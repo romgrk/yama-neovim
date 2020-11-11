@@ -70,7 +70,7 @@ class Application extends EventEmitter {
   }
 
   onRequested(method, args, response) {
-      console.log('requested: ', method, args, response);
+    console.log('requested: ', method, args, response);
   }
 
   onNotified(method, args) {

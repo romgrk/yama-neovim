@@ -22,6 +22,7 @@ const Font = require('../helpers/font.js')
 const generateTheme = require('./theme.js')
 const Screen = require('./screen.js')
 const Cmdline = require('./cmdline.js')
+const Completion = require('./completion.js')
 // const Finder = require('./components/Finder.js')
 
 const GtkStyleProviderPriority = {
@@ -49,7 +50,6 @@ class Window extends Gtk.Window {
      */
 
     this.headerBar = new Gtk.HeaderBar()
-    this.closeButton = Gtk.Button.newFromIconName('window-close', Gtk.IconSize.SMALL_TOOLBAR)
 
     // Editors area
     this.gridContainer = new Gtk.Overlay()
@@ -58,6 +58,9 @@ class Window extends Gtk.Window {
 
     // Cmdline
     this.cmdline = new Cmdline(store, app)
+
+    // Completion
+    this.completion = new Completion(store, app, this.gridContainer)
 
     // Container
     this.box = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL })
@@ -69,7 +72,7 @@ class Window extends Gtk.Window {
      * Build our layout
      */
 
-    this.headerBar.packEnd(this.closeButton)
+    this.headerBar.showCloseButton = true
     this.setTitlebar(this.headerBar)
 
     this.box.packStart(this.gridContainer, true,  true, 0)
@@ -102,14 +105,27 @@ class Window extends Gtk.Window {
     })
   }
 
-  onGetChildPosition = (screen, rectangle) => {
-    const grid = screen.grid
+  onGetChildPosition = (element, rectangle) => {
+    const isCompletion = element === this.completion
+    // if (isCompletion)
+      // debugger
+    const grid = element.grid
     const font = this.store.font
     const dimensions = this.store.dimensions
     rectangle.x = grid.col * font.cellWidth
     rectangle.y = grid.row * font.cellHeight + (2 * dimensions.remainingHeight)
-    rectangle.width  = grid.width  * font.cellHeight
+    rectangle.width  = grid.width  * font.cellWidth
     rectangle.height = grid.height * font.cellHeight
+    if (isCompletion) {
+      element.computePosition(rectangle)
+    } 
+    console.log(
+      isCompletion || grid.id,
+      rectangle.x,
+      rectangle.y,
+      rectangle.width,
+      rectangle.height,
+    )
     return true
   }
 
@@ -139,12 +155,13 @@ class Window extends Gtk.Window {
     if (this.provider) {
       Gtk.StyleContext.removeProviderForScreen(screen, this.provider)
     }
+    const theme = generateTheme(this.store)
     this.provider = new Gtk.CssProvider()
-    this.provider.loadFromData(generateTheme(this.store))
+    this.provider.loadFromData(theme)
     Gtk.StyleContext.addProviderForScreen(
       screen,
       this.provider,
-      GtkStyleProviderPriority.APPLICATION
+      GtkStyleProviderPriority.USER
     )
   }
 

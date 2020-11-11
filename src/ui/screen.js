@@ -131,11 +131,20 @@ module.exports = class Screen extends Gtk.DrawingArea {
 
     /* Draw separator */
     if (grid.col !== 0) {
-      const separatorColor = Color.toHex(this.store.hlAttributes[this.store.hlGroups.VertSplit].foreground)
+      const separatorColor = Color.darken(Color.toHex(this.store.backgroundColor), 0.4)
       setContextColorFromHex(context, separatorColor)
       context.rectangle(0, 0, 1, allocatedHeight)
       context.fill()
     }
+
+    /* Debug information */
+    if (this.cairoSurface)
+      this.drawText(0, 0, String(grid.id), {
+        foreground: 0x770000,
+      }, context)
+    setContextColorFromHex(context, '#550000')
+    context.rectangle(0, 0, allocatedWidth - 1, allocatedHeight)
+    context.stroke()
 
     return true
   }
