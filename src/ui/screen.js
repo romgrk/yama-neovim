@@ -47,7 +47,8 @@ module.exports = class Screen extends Gtk.DrawingArea {
 
   onHide = () => {
     this._parent = this.getParent()
-    this._parent.remove(this)
+    if (this._parent)
+      this._parent.remove(this)
   }
 
   onFlush = () => this.queueDraw()
