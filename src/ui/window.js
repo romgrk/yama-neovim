@@ -103,8 +103,8 @@ class Window extends Gtk.Window {
     this.gridContainer.on('get-child-position', (screen, rectangle) => {
       const grid = screen.grid
       const font = this.store.font
-      rectangle.x = grid.position.col * font.cellWidth
-      rectangle.y = grid.position.row * font.cellHeight
+      rectangle.x = grid.col * font.cellWidth
+      rectangle.y = grid.row * font.cellHeight
       rectangle.width  = grid.width * font.cellHeight
       rectangle.height = grid.height * font.cellHeight
       return true

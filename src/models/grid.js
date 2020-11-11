@@ -15,23 +15,29 @@ class Grid extends EventEmitter {
     this.win = 0
     this.anchor = undefined
     this.anchorGrid = 0
+    this.float = false
     this.focusable = true
     this.external = false
     this.hidden = false
-    this.position = {
-      row: 0,
-      col: 0,
-      width: 0,
-      height: 0,
-    }
+    /* this.position = {
+     *   row: 0,
+     *   col: 0,
+     *   width: 0,
+     *   height: 0,
+     * } */
     this.viewport = {
       topline: 0,
       botline: 0,
       curline: 0,
       curcol: 0,
     }
+    this.row  = 0
+    this.col = 0
     this.width  = 0
     this.height = 0
+    /* Object.defineProperty(this, 'position', {
+     *   get: () => { debugger }
+     * }) */
     this.buffer = []
     this.ids = []
     this.resize(width, height)
@@ -39,15 +45,19 @@ class Grid extends EventEmitter {
 
   setPos(win, row, col, width, height) {
     this.win = win
-    this.position = { row, col, width, height }
-    this.emit('position', this.position)
+    this.row = row
+    this.col = col
+    this.resize(width, height, false)
+    this.emit('position', this)
   }
 
   setFloatPos(win, anchor, anchorGrid, row, col, focusable) {
     this.win = win
+    this.float = true
     this.anchor = anchor
     this.anchorGrid = anchorGrid
-    this.position = { row, col }
+    this.row = row
+    this.col = col
     this.focusable = focusable
     this.emit('float-position', this)
   }
@@ -69,7 +79,6 @@ class Grid extends EventEmitter {
 
   close() {
     this.emit('close')
-    // delete
   }
 
   setExternalPos(win) {
@@ -83,7 +92,7 @@ class Grid extends EventEmitter {
     this.emit('clear')
   }
 
-  resize(width, height) {
+  resize(width, height, event = true) {
     const previousBuffer = this.buffer
     const previousWidth = this.width
 
@@ -105,7 +114,8 @@ class Grid extends EventEmitter {
 
       this.buffer[newIndex] = previousBuffer[i]
     }
-    this.emit('resize', this)
+    if (event)
+      this.emit('resize', this)
   }
 
   setCells(row, col, cells) {

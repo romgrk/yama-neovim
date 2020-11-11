@@ -163,6 +163,8 @@ module.exports = class NeovimStore extends EventEmitter {
 
       // console.log(name, allArgs)
       // console.log(name, args)
+      if (name.includes('win_'))
+        console.log(name, args)
 
       switch (name) {
         case 'default_colors_set': {
@@ -211,7 +213,8 @@ module.exports = class NeovimStore extends EventEmitter {
         }
         case 'grid_destroy': {
           const [index] = args
-          delete this.grids.get(index)
+          this.grids.get(index).close()
+          delete this.grids[index]
           break
         }
         case 'grid_cursor_goto': {
@@ -248,7 +251,7 @@ module.exports = class NeovimStore extends EventEmitter {
         case 'win_close': {
           const [index] = args
           this.grids.get(index).close()
-          delete this.grids.get(index)
+          delete this.grids[index]
           break
         }
         // case 'msg_set_pos': {}

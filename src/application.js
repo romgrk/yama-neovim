@@ -129,7 +129,7 @@ class Application extends EventEmitter {
     const event = KeyEvent.fromGdk(gdkEvent)
     const input = KeyEvent.getVimInput(event)
     const shouldFilter = KeyEvent.shouldFilter(event)
-    console.log('KeyPress', { input, shouldFilter })
+    // console.log('KeyPress', { input, shouldFilter })
     if (!shouldFilter)
       this.client.input(input)
     return true

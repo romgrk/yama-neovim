@@ -31,9 +31,32 @@ module.exports = class Screen extends Gtk.DrawingArea {
     this.addEvents(Gdk.EventMask.ALL_EVENTS_MASK)
     this.on('draw', this.onDraw)
 
-    this.store.on('flush', () => this.queueDraw())
-    this.grid.on('resize', () =>
-      this.updateDimensions(this.grid.height, this.grid.width))
+    this.store.on('flush', this.onFlush)
+    this.grid.on('resize', this.onResize)
+    this.grid.on('position', this.onPosition)
+    this.grid.on('hide', this.onHide)
+    this.grid.on('close', () => this.destroy())
+  }
+
+  destroy() {
+    this.store.removeListener('flush', this.onFlush)
+  }
+
+  onHide = () => {
+    this._parent = this.getParent()
+    this._parent.remove(this)
+  }
+
+  onFlush = () => this.queueDraw()
+
+  onResize = () =>
+    this.updateDimensions(this.grid.height, this.grid.width)
+
+  onPosition = () => {
+    if (this._parent) {
+      this._parent.add(this)
+      this._parent = undefined
+    }
   }
 
   updateDimensions = (lines, cols) => {
@@ -126,7 +149,7 @@ module.exports = class Screen extends Gtk.DrawingArea {
   }
 
   drawText(row, col, text, attr, context) {
-    this.pangoLayout.setMarkup(renderText(attr, text))
+    this.pangoLayout.setMarkup(renderText(text, attr, this.store.hlAttributes.default))
 
     const {width} = this.pangoLayout.getPixelExtents()[1]
     // const calculatedWidth = this.font.cellWidth * token.text.length
@@ -267,31 +290,38 @@ function lineToMarkup(line, hlAttributes) {
   for (let i = 0; i < line.length; i++) {
     const [char, hl] = line[i]
     if (hl !== lastHL && i !== 0) {
-      markup += renderText(hlAttributes[lastHL] || hlAttributes.default, text)
+      markup += renderText(text, hlAttributes[lastHL], hlAttributes.default)
       text = ''
     }
     text += char
     lastHL = hl
   }
   if (text !== '') {
-    markup += renderText(hlAttributes[lastHL] || hlAttributes.default, text)
+    markup += renderText(text, hlAttributes[lastHL], hlAttributes.default)
     text = ''
   }
   return markup
 }
 
-function renderText(style, text) {
+function renderText(text, style, defaults) {
   let result = '<span '
+  let didFg = false
+  let didBg = false
   for (let key in style) {
     const value = style[key]
     switch (key) {
-      case 'foreground': result += `foreground="${colorToHex(value)}" `; break
-      case 'background': result += `background="${colorToHex(value)}" `; break
+      case 'foreground': result += `foreground="${colorToHex(value)}" `; didFg = true; break
+      case 'background': result += `background="${colorToHex(value)}" `; didBg = true; break
       case 'fontWeight': result += `weight="${value}" `; break
       case 'size': result += `size="${value}" `; break
       case 'style': result += `style="${value}" `; break
     }
   }
+  if (!didFg)
+    result += `foreground="${colorToHex(defaults.foreground)}" `
+  if (!didBg)
+    result += `background="${colorToHex(defaults.background)}" `
+
   result += `>${escapeMarkup(text)}</span>`
   return result
 }
