@@ -343,12 +343,15 @@ class NeovimStore extends EventEmitter {
         case 'update_menu':
         case 'bell':
         case 'visual_bell':
+        case 'tabline_update':
         {
           // console.warn(chalk.bold.red('Unhandled event: ') + name, args);
           break
         }
-        case 'tabline_update':
-        case 'msg_show':
+        case 'msg_show': {
+          console.log(allArgs)
+          break
+        }
         case 'msg_showmode':
         case 'msg_showcmd':
         case 'msg_ruler':
@@ -424,26 +427,3 @@ class NeovimStore extends EventEmitter {
 const store = new NeovimStore()
 
 module.exports = store
-
-function copy(object) {
-    return JSON.parse(JSON.stringify(object))
-}
-
-// Note: 0x001203 -> '#001203'
-function colorToString(color, fallback) {
-    if (typeof color !== 'number' || color < 0) {
-        return fallback;
-    }
-
-    return (
-        '#' +
-        [16, 8, 0]
-            .map(shift => {
-                const mask = 0xff << shift;
-                const hex = ((color & mask) >> shift).toString(16);
-                return hex.length < 2 ? '0' + hex : hex;
-            })
-            .join('')
-    );
-}
-
